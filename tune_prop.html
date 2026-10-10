@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>螺旋桨调试台 · 喷火式</title>
+<style>
+  :root {
+    --panel: rgba(12, 18, 22, 0.88);
+    --line: rgba(120, 180, 210, 0.3);
+    --accent: #6fd0ff;
+    --warn: #ffb84d;
+    --fire: #ff5a4d;
+    --text: #d7e6ee;
+    --muted: #8aa0ad;
+    --prop: #6fff8a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #05080a; color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; font-size: 13px; }
+  #scene { display: block; width: 100vw; height: 100vh; }
+
+  /* 顶部 */
+  #topbar { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 11;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 22px;
+    padding: 6px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; max-width: 95vw; }
+  #topbar label { color: var(--muted); font-size: 12px; }
+  #topbar select { background: rgba(0,0,0,.4); color: var(--accent); border: 1px solid var(--line);
+    border-radius: 4px; padding: 4px 8px; font-size: 13px; cursor: pointer; }
+  #topbar button { background: rgba(111,208,255,.1); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--text); padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  #topbar button:hover { background: rgba(111,208,255,.2); }
+  #topbar button.go { background: var(--accent); color: #05080a; font-weight: 600; }
+  #topbar button.prop { color: var(--prop); border-color: rgba(111,255,138,.4); }
+  #topbar small { color: var(--muted); font-size: 11px; }
+
+  /* 右侧面板 */
+  #panel { position: fixed; top: 60px; right: 14px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; width: 340px; max-height: calc(100vh - 80px); overflow: auto;
+    font-size: 12px; backdrop-filter: blur(6px); }
+  #panel h4 { color: var(--accent); letter-spacing: 1px; margin: 14px 0 6px; font-size: 12px;
+    border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+  #panel h4:first-child { margin-top: 0; }
+  .ctrl { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .ctrl label { width: 72px; color: var(--muted); }
+  .ctrl input[type=range] { flex: 1; min-width: 60px; }
+  .ctrl .val { width: 56px; text-align: right; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .ctrl input[type=number].val {
+    background: rgba(0,0,0,.4); border: 1px solid var(--line); border-radius: 3px;
+    padding: 2px 4px; font-size: 12px; font-family: Consolas, monospace;
+  }
+  .ctrl input[type=number].val:focus { outline: none; border-color: var(--accent); }
+  .ctrl select { flex: 1; background: rgba(0,0,0,.4); color: var(--accent);
+    border: 1px solid var(--line); border-radius: 3px; padding: 2px 6px; font-size: 12px; }
+  .btn-row { display: flex; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
+  .btn-row button { background: rgba(111,208,255,.1); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--text); padding: 4px 10px; font-size: 11px; cursor: pointer; }
+  .btn-row button:hover { background: rgba(111,208,255,.2); }
+  .btn-row button.active { background: var(--accent); color: #05080a; font-weight: 600; }
+  .btn-row button.prop { color: var(--prop); border-color: rgba(111,255,138,.4); }
+  .btn-row button.warn { color: var(--warn); border-color: rgba(255,184,77,.4); }
+
+  /* 左侧信息 */
+  #info { position: fixed; top: 60px; left: 12px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 12px; width: 300px; font-size: 11px; font-family: Consolas, monospace;
+    max-height: calc(100vh - 80px); overflow: auto; }
+  #info h4 { color: var(--prop); letter-spacing: 1px; margin: 10px 0 4px; font-size: 11px; }
+  #info h4:first-child { margin-top: 0; }
+  #info .row { display: flex; justify-content: space-between; margin: 2px 0; color: var(--muted); }
+  #info .row .v { color: var(--text); }
+  #info .row .prop { color: var(--prop); }
+  #info .row .warn { color: var(--warn); }
+
+  /* 状态条 */
+  #status { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 11;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    padding: 4px 16px; color: var(--muted); font-size: 11px; }
+  #status.ok { color: var(--prop); border-color: rgba(111,255,138,.3); }
+  #status.err { color: var(--fire); border-color: rgba(255,90,77,.3); }
+
+  .check { display: flex; align-items: center; gap: 6px; margin: 4px 0; cursor: pointer; }
+  .check input { margin: 0; }
+  .check label { color: var(--muted); cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<!-- 顶栏 -->
+<div id="topbar">
+  <label>模型</label>
+  <select id="model-sel">
+    <option value="/model/spitfire.glb" selected>喷火式 Spitfire</option>
+    <option value="/model/yak1.glb">Yak-1</option>
+    <option value="/model/yak3.glb">Yak-3</option>
+    <option value="/model/yak9.glb">Yak-9</option>
+    <option value="/model/bf109_opt.glb">Bf-109 (玩家)</option>
+  </select>
+  <button class="go" id="btn-load">加载模型</button>
+  <small>|</small>
+  <button class="prop" id="btn-auto-rotate">自动旋转: 开</button>
+  <button id="btn-reset-view">重置视角</button>
+  <small>|</small>
+  <button class="fire" id="btn-export">📋 导出配置</button>
+</div>
+
+<!-- 导出配置弹窗 -->
+<div id="export-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:20;
+     background:var(--panel); border:1px solid var(--accent); border-radius:8px; padding:16px; max-width:600px; width:90%;">
+  <h3 style="color:var(--accent); margin-bottom:8px;">导出配置（复制给 AI 应用到游戏）</h3>
+  <textarea id="export-text" readonly style="width:100%; height:280px; background:rgba(0,0,0,.5); color:var(--prop);
+    border:1px solid var(--line); border-radius:4px; padding:8px; font-family:monospace; font-size:12px;"></textarea>
+  <div style="margin-top:8px; display:flex; gap:8px; justify-content:flex-end;">
+    <button id="btn-copy-export" style="background:rgba(111,255,138,.15); border:1px solid var(--prop); color:var(--prop);
+      border-radius:4px; padding:6px 16px; cursor:pointer;">复制到剪贴板</button>
+    <button id="btn-close-export" style="background:rgba(255,90,77,.15); border:1px solid var(--fire); color:var(--fire);
+      border-radius:4px; padding:6px 16px; cursor:pointer;">关闭</button>
+  </div>
+</div>
+
+<!-- 左侧信息面板 -->
+<div id="info">
+  <h4>模型朝向</h4>
+  <div id="model-rot-info">-</div>
+  <h4>螺旋桨节点</h4>
+  <div id="prop-info">未加载</div>
+  <h4>桨毂 Pivot</h4>
+  <div id="pivot-info">未创建</div>
+  <h4>桨叶世界坐标</h4>
+  <div id="blade-pos">-</div>
+</div>
+
+<!-- 右侧控制面板 -->
+<div id="panel">
+  <h4>① 模型朝向修正（先调这步）</h4>
+  <div class="ctrl">
+    <label>Pitch X°</label>
+    <input type="range" id="model-rot-x" min="-180" max="180" step="0.5" value="0">
+    <input type="number" class="val" id="model-rot-x-val" value="0" step="0.5">
+  </div>
+  <div class="ctrl">
+    <label>Yaw Y°</label>
+    <input type="range" id="model-rot-y" min="-180" max="180" step="0.5" value="0">
+    <input type="number" class="val" id="model-rot-y-val" value="0" step="0.5">
+  </div>
+  <div class="ctrl">
+    <label>Roll Z°</label>
+    <input type="range" id="model-rot-z" min="-180" max="180" step="0.5" value="0">
+    <input type="number" class="val" id="model-rot-z-val" value="0" step="0.5">
+  </div>
+  <div class="btn-row">
+    <button id="btn-reset-model-rot">归零</button>
+    <button id="btn-auto-orient">自动朝向(只算Yaw)</button>
+  </div>
+  <div class="check">
+    <input type="checkbox" id="show-world-axis" checked>
+    <label for="show-world-axis">显示世界坐标轴参考</label>
+  </div>
+
+  <h4>② 旋转控制</h4>
+  <div class="ctrl">
+    <label>转速 rad/s</label>
+    <input type="range" id="spin-speed" min="0" max="600" step="5" value="95">
+    <span class="val" id="spin-speed-val">95</span>
+  </div>
+  <div class="ctrl">
+    <label>旋转轴</label>
+    <select id="spin-axis">
+      <option value="z" selected>Z (机头轴)</option>
+      <option value="y">Y</option>
+      <option value="x">X</option>
+    </select>
+  </div>
+  <div class="check">
+    <input type="checkbox" id="auto-rotate" checked>
+    <label for="auto-rotate">每帧自动旋转</label>
+  </div>
+
+  <h4>旋转轴倾斜修正</h4>
+  <div class="ctrl">
+    <label>倾斜 X°</label>
+    <input type="range" id="tilt-x" min="-180" max="180" step="0.5" value="0">
+    <input type="number" class="val" id="tilt-x-val" value="0" step="0.5">
+  </div>
+  <div class="ctrl">
+    <label>倾斜 Y°</label>
+    <input type="range" id="tilt-y" min="-180" max="180" step="0.5" value="0">
+    <input type="number" class="val" id="tilt-y-val" value="0" step="0.5">
+  </div>
+  <div class="btn-row">
+    <button id="btn-reset-tilt">归零倾斜</button>
+    <button class="warn" id="btn-show-axis">显示旋转轴</button>
+  </div>
+
+  <h4>桨毂圆心（Pivot 位置）</h4>
+  <div class="ctrl">
+    <label>X 偏移</label>
+    <input type="range" id="pivot-x" min="-5" max="5" step="0.001" value="0">
+    <input type="number" class="val" id="pivot-x-val" value="0" step="0.001">
+  </div>
+  <div class="ctrl">
+    <label>Y 偏移</label>
+    <input type="range" id="pivot-y" min="-5" max="5" step="0.001" value="0">
+    <input type="number" class="val" id="pivot-y-val" value="0" step="0.001">
+  </div>
+  <div class="ctrl">
+    <label>Z 偏移</label>
+    <input type="range" id="pivot-z" min="-5" max="5" step="0.001" value="0">
+    <input type="number" class="val" id="pivot-z-val" value="0" step="0.001">
+  </div>
+  <div class="btn-row">
+    <button id="btn-recompute-pivot">重新计算质心</button>
+    <button id="btn-reset-pivot">归零偏移</button>
+  </div>
+
+  <h4>桨叶材质</h4>
+  <div class="ctrl">
+    <label>透明度</label>
+    <input type="range" id="opacity" min="0.05" max="1" step="0.01" value="0.14">
+    <span class="val" id="opacity-val">0.14</span>
+  </div>
+  <div class="check">
+    <input type="checkbox" id="transparent" checked>
+    <label for="transparent">transparent=true</label>
+  </div>
+  <div class="btn-row">
+    <button id="btn-apply-opacity">应用到桨叶</button>
+  </div>
+
+  <h4>动态模糊（Motion Blur）</h4>
+  <div class="ctrl">
+    <label>模糊强度</label>
+    <input type="range" id="motion-blur" min="0" max="1" step="0.05" value="0.35">
+    <span class="val" id="motion-blur-val">0.35</span>
+  </div>
+  <div class="check">
+    <input type="checkbox" id="blur-auto-speed" checked>
+    <label for="blur-auto-speed">转速自适应（低速透明，高速满盘）</label>
+  </div>
+
+  <h4>分组模式</h4>
+  <div class="btn-row">
+    <button class="prop active" id="btn-single-group">单组（三叶合一）</button>
+    <button id="btn-multi-group">多组（各自旋转）</button>
+  </div>
+
+  <h4>调试可视化</h4>
+  <div class="check">
+    <input type="checkbox" id="show-pivot-marker" checked>
+    <label for="show-pivot-marker">显示桨毂标记（红球）</label>
+  </div>
+  <div class="check">
+    <input type="checkbox" id="show-blade-centers">
+    <label for="show-blade-centers">显示桨叶中心（绿球）</label>
+  </div>
+  <div class="check">
+    <input type="checkbox" id="show-bbox">
+    <label for="show-bbox">显示桨叶包围盒</label>
+  </div>
+  <div class="check">
+    <input type="checkbox" id="show-axis">
+    <label for="show-axis">显示旋转轴</label>
+  </div>
+  <div class="check">
+    <input type="checkbox" id="wireframe">
+    <label for="wireframe">线框模式</label>
+  </div>
+
+  <h4>场景</h4>
+  <div class="ctrl">
+    <label>背景色</label>
+    <input type="color" id="bg-color" value="#1a2030" style="flex:1; height:24px; border:1px solid var(--line); border-radius:3px; background:transparent;">
+  </div>
+  <div class="ctrl">
+    <label>机身显示</label>
+    <select id="body-visibility">
+      <option value="full" selected>完整显示</option>
+      <option value="hidden">隐藏机身（只看桨）</option>
+      <option value="ghost">半透明机身</option>
+    </select>
+  </div>
+</div>
+
+<!-- 状态条 -->
+<div id="status">就绪</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/node_modules/three/build/three.module.js",
+    "three/addons/": "/node_modules/three/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+// ========== 模型配置（与 enemy.js MODEL_CONFIGS 一致）==========
+const MODEL_CONFIGS = {
+  '/model/spitfire.glb':   { propNodes: ['Cylinder78-FACES_1','Cylinder79-FACES_1','Cylinder77-FACES_1'], hideGear: true },
+  '/model/yak1.glb':       { propNodes: ['Line16-FACES_1','Line17-FACES_1','Line05-FACES_1'] },
+  '/model/yak3.glb':       { propNodes: ['Line30-FACES_1','Line29-FACES_1','Line05-FACES_1'] },
+  '/model/yak9.glb':       { propNodes: ['Line30-FACES_1','Line29-FACES_1','Line05-FACES_1'] },
+  '/model/bf109_opt.glb':  { propNodes: null },  // Bf-109 用关键词匹配
+};
+const PROP_KEYWORDS = ['prop','螺旋桨','airscrew','propeller','vint','винт'];
+function isPropName(name) {
+  if (!name) return false;
+  const n = name.toLowerCase();
+  return PROP_KEYWORDS.some(k => n.includes(k));
+}
+
+// ========== 全局状态 ==========
+let scene, camera, renderer, controls, clock;
+let model = null;          // 加载的 gltf.scene（已归一化）
+let modelRoot = null;      // 模型根 Group（含缩放/居中）
+let propPivot = null;      // 桨毂 pivot Group
+let blades = [];           // 桨叶节点列表
+let pivotMarker = null;    // 桨毂标记球（兼容旧引用，指向第一个）
+let pivotMarkers = [];     // 所有桨毂标记球列表（多组模式多个）
+let bladeCenterMarkers = []; // 桨叶中心标记球列表
+let bboxHelpers = [];      // 包围盒 Helper 列表
+let axisHelper = null;     // 旋转轴指示线
+let worldAxisHelper = null; // 世界坐标轴参考（AxesHelper）
+
+let state = {
+  spinSpeed: 95,
+  spinAxis: 'z',
+  autoRotate: true,
+  pivotOffset: { x: 0, y: 0, z: 0 },
+  axisTilt: { x: 0, y: 0 },   // 旋转轴倾斜（度），修正桨毂轴与模型轴的偏斜
+  modelRot: { x: 0, y: 0, z: 0 }, // 模型整体朝向（度），校正模型坐标系与世界轴的偏斜
+  opacity: 0.14,
+  transparent: true,
+  motionBlur: 0.35,        // 动态模糊强度 0-1（0=关，1=最大）
+  singleGroup: true,       // true=单组（三叶合一），false=多组（各自旋转）
+  showPivotMarker: true,
+  showBladeCenters: false,
+  showBbox: false,
+  showAxis: false,
+  wireframe: false,
+  bodyVisibility: 'full',
+};
+
+let multiPivots = [];      // spin Group 列表（每帧旋转的对象）
+let propTilts = [];        // tilt Group 列表（承载位置+轴倾斜，是 spin 的父级）
+let propRigs = [];         // rig Group 列表（scene 子级，世界空间，tilt 的父级）
+let bladeCentersModel = []; // 每片桨叶的模型空间中心（首次计算后不变）
+let baseCentersModel = []; // 桨毂模型空间中心（按分组模式聚合，避免旋转后质心漂移）
+let blurDiscs = [];        // 动态模糊盘面 mesh 列表
+let blurGhosts = [];       // 动态模糊残影 mesh 列表（每个分组 N 个 ghost）
+let bladeRadius = 1;       // 桨叶最大半径（从桨毂中心到桨尖，垂直于旋转轴的投影）
+let propBboxModel = null;  // 桨叶模型空间包围盒 {min, max, center}（用于按旋转轴算投影半径）
+
+// ========== 初始化 ==========
+function init() {
+  const canvas = document.getElementById('scene');
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a2030);
+
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
+  camera.position.set(8, 4, 12);
+
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  // 光照
+  const hemi = new THREE.HemisphereLight(0xa8b8c8, 0x3a4a55, 1.5);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xe8d8b8, 2.5);
+  sun.position.set(20, 30, 15);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 100;
+  sun.shadow.camera.left = -30;
+  sun.shadow.camera.right = 30;
+  sun.shadow.camera.top = 30;
+  sun.shadow.camera.bottom = -30;
+  scene.add(sun);
+
+  // 地面网格
+  const grid = new THREE.GridHelper(40, 40, 0x4a5a6e, 0x2a3540);
+  grid.position.y = -5;
+  scene.add(grid);
+
+  // 世界坐标轴参考（X=红 右, Y=绿 上, Z=蓝 前）
+  worldAxisHelper = new THREE.AxesHelper(6);
+  scene.add(worldAxisHelper);
+
+  // OrbitControls
+  controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.target.set(0, 0, 0);
+  controls.minDistance = 2;
+  controls.maxDistance = 50;
+
+  clock = new THREE.Clock();
+
+  window.addEventListener('resize', onResize);
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ========== 模型加载 ==========
+async function loadModel(url) {
+  setStatus('加载中: ' + url, '');
+  // 清理旧模型
+  if (modelRoot) {
+    scene.remove(modelRoot);
+    modelRoot = null;
+    model = null;
+  }
+  clearPropSetup();
+
+  const loader = new GLTFLoader();
+  const draco = new DRACOLoader();
+  draco.setDecoderPath('/node_modules/three/examples/jsm/libs/draco/');
+  loader.setDRACOLoader(draco);
+  loader.setMeshoptDecoder(MeshoptDecoder);
+
+  try {
+    const gltf = await loader.loadAsync(url);
+    model = gltf.scene;
+
+    // 归一化：缩放到最长边 9 单位 + 居中
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const longest = Math.max(size.x, size.y, size.z) || 1;
+    const baseScale = 9 / longest;
+    model.scale.setScalar(baseScale);
+    model.position.copy(center).multiplyScalar(-baseScale);
+
+    // 隐藏起落架
+    const cfg = MODEL_CONFIGS[url] || {};
+    model.traverse(o => {
+      if (o.isMesh) {
+        o.castShadow = true;
+        o.receiveShadow = true;
+        if (cfg.hideGear && /gear|wheel|landing|起落架/i.test(o.name)) o.visible = false;
+      }
+    });
+
+    modelRoot = new THREE.Group();
+    modelRoot.add(model);
+    scene.add(modelRoot);
+
+    // 重置模型朝向状态 + UI
+    state.modelRot = { x: 0, y: 0, z: 0 };
+    ['x','y','z'].forEach(axis => {
+      const s = document.getElementById('model-rot-' + axis);
+      const n = document.getElementById('model-rot-' + axis + '-val');
+      if (s) { s.value = 0; n.value = 0; }
+    });
+
+    setStatus('模型加载完成', 'ok');
+
+    // 自动朝向：以螺旋桨质心为机头方向，对齐 -Z（只算 Yaw）
+    autoOrient();
+
+    // 设置螺旋桨
+    setupProp(url);
+
+    // 更新信息面板
+    updateInfoPanel();
+  } catch (err) {
+    console.error('模型加载失败:', err);
+    setStatus('加载失败: ' + err.message, 'err');
+  }
+}
+
+// ========== 自动朝向 ==========
+function autoOrient() {
+  if (!model) return;
+  model.updateWorldMatrix(true, true);
+  const cfg = MODEL_CONFIGS[document.getElementById('model-sel').value] || {};
+  const propNames = cfg.propNodes;
+  const propNodes = [];
+  if (propNames && propNames.length) {
+    const set = new Set(propNames);
+    model.traverse(o => { if (o.name && set.has(o.name)) propNodes.push(o); });
+  } else {
+    model.traverse(o => { if (isPropName(o.name)) propNodes.push(o); });
+  }
+  if (!propNodes.length) return;
+
+  const c = new THREE.Vector3();
+  propNodes.forEach(o => {
+    const wp = new THREE.Vector3();
+    o.getWorldPosition(wp);
+    c.add(wp);
+  });
+  c.divideScalar(propNodes.length);
+
+  // 机头方向 = 从模型中心指向螺旋桨质心
+  const modelCenter = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
+  const forward = c.clone().sub(modelCenter).normalize();
+  // 对齐 -Z（只算 yaw，pitch/roll 由用户手动调）
+  const yaw = Math.atan2(forward.x, -forward.z);
+  state.modelRot.y = yaw * 180 / Math.PI;
+  applyModelRotation();
+  // 同步 UI
+  const ySlider = document.getElementById('model-rot-y');
+  const yNum = document.getElementById('model-rot-y-val');
+  if (ySlider) { ySlider.value = state.modelRot.y; yNum.value = state.modelRot.y.toFixed(1); }
+}
+
+/** 应用模型整体旋转（X/Y/Z 三轴，校正模型坐标系偏斜） */
+function applyModelRotation() {
+  if (!modelRoot) return;
+  modelRoot.rotation.x = state.modelRot.x * Math.PI / 180;
+  modelRoot.rotation.y = state.modelRot.y * Math.PI / 180;
+  modelRoot.rotation.z = state.modelRot.z * Math.PI / 180;
+}
+
+// ========== 螺旋桨设置 ==========
+function clearPropSetup() {
+  blades = [];
+  if (propPivot) { propPivot = null; }
+  multiPivots = [];
+  propTilts = [];
+  propRigs.forEach(r => r.parent?.remove(r));
+  propRigs = [];
+  bladeCentersModel = [];
+  baseCentersModel = [];
+  propBboxModel = null;
+  blurDiscs.forEach(d => d.parent?.remove(d));
+  blurDiscs = [];
+  blurGhosts.forEach(g => g.parent?.remove(g));
+  blurGhosts = [];
+  pivotMarkers.forEach(m => scene.remove(m));
+  pivotMarkers = [];
+  pivotMarker = null;
+  bladeCenterMarkers.forEach(m => scene.remove(m));
+  bladeCenterMarkers = [];
+  bboxHelpers.forEach(h => scene.remove(h));
+  bboxHelpers = [];
+  if (axisHelper) { scene.remove(axisHelper); axisHelper = null; }
+}
+
+function setupProp(url) {
+  clearPropSetup();
+  if (!model) return;
+
+  const cfg = MODEL_CONFIGS[url] || {};
+  const propNames = cfg.propNodes;
+
+  // 找桨叶节点
+  if (propNames && propNames.length) {
+    const set = new Set(propNames);
+    model.traverse(o => { if (o.name && set.has(o.name)) blades.push(o); });
+  } else {
+    // 关键词匹配
+    model.traverse(o => { if (isPropName(o.name)) blades.push(o); });
+  }
+
+  if (!blades.length) {
+    setStatus('未找到螺旋桨节点', 'err');
+    return;
+  }
+
+  // 深拷贝材质（避免共享）
+  blades.forEach(b => {
+    b.traverse(o => {
+      if (o.isMesh && o.material) {
+        if (Array.isArray(o.material)) o.material = o.material.map(m => m.clone());
+        else o.material = o.material.clone();
+      }
+    });
+  });
+
+  // 计算每片桨叶的模型空间中心（只算一次，此时桨叶尚未被旋转，位置是原始的）
+  // 之后 rebuildPivot 复用聚合值，避免 spin 旋转后质心漂移导致 rig 乱跳
+  model.updateWorldMatrix(true, true);
+  bladeCentersModel = blades.map(b => {
+    const tmpBox = new THREE.Box3().setFromObject(b);
+    const center = new THREE.Vector3();
+    tmpBox.getCenter(center);
+    return model.worldToLocal(center);
+  });
+  recomputeBaseCenters();
+
+  // 计算桨叶模型空间包围盒（存储，后续按旋转轴算投影半径）
+  {
+    const tmpBox = new THREE.Box3();
+    blades.forEach(b => tmpBox.expandByObject(b));
+    const center = new THREE.Vector3();
+    tmpBox.getCenter(center);
+    propBboxModel = {
+      min: model.worldToLocal(tmpBox.min.clone()),
+      max: model.worldToLocal(tmpBox.max.clone()),
+      center: model.worldToLocal(center),
+    };
+  }
+  computeBladeRadius();
+
+  // 创建 pivot
+  rebuildPivot();
+  applyOpacity();
+  applyWireframe();
+  applyBodyVisibility();
+  updateDebugVisuals();
+}
+
+/** 按分组模式聚合桨叶模型空间中心（单组=质心，多组=各自中心） */
+function recomputeBaseCenters() {
+  baseCentersModel = [];
+  if (!bladeCentersModel.length) return;
+  if (state.singleGroup) {
+    const avg = new THREE.Vector3();
+    bladeCentersModel.forEach(c => avg.add(c));
+    avg.divideScalar(bladeCentersModel.length);
+    baseCentersModel.push(avg);
+  } else {
+    bladeCentersModel.forEach(c => baseCentersModel.push(c.clone()));
+  }
+}
+
+function rebuildPivot() {
+  if (!blades.length || !baseCentersModel.length) return;
+
+  // 保存旧 spin 引用和累积旋转四元数（重建后恢复，避免跳帧）
+  const oldSpins = multiPivots.slice();
+  const oldTilts = propTilts.slice();
+  const oldRigs = propRigs.slice();
+  const savedQuats = oldSpins.map(p => p.quaternion.clone());
+
+  // 确保模型世界矩阵正确（attach 需要正确的世界位置）
+  if (modelRoot) modelRoot.updateWorldMatrix(true, true);
+
+  // 用存储的模型空间中心转换为世界空间（不重新计算，避免旋转后质心漂移）
+  // 偏移在世界空间直接加（用户看到的就是世界坐标）
+  const groups = [];
+  if (state.singleGroup) {
+    const worldCenter = model.localToWorld(baseCentersModel[0].clone());
+    worldCenter.x += state.pivotOffset.x;
+    worldCenter.y += state.pivotOffset.y;
+    worldCenter.z += state.pivotOffset.z;
+    groups.push({ center: worldCenter, blades: blades.slice() });
+  } else {
+    blades.forEach((b, idx) => {
+      const worldCenter = model.localToWorld(baseCentersModel[idx].clone());
+      worldCenter.x += state.pivotOffset.x;
+      worldCenter.y += state.pivotOffset.y;
+      worldCenter.z += state.pivotOffset.z;
+      groups.push({ center: worldCenter, blades: [b] });
+    });
+  }
+
+  // 重置数组（旧组暂不移除，等 attach 完成后再清理）
+  multiPivots = [];
+  propTilts = [];
+  propRigs = [];
+  propPivot = null;
+
+  // 创建 rig→tilt→spin 嵌套结构
+  // rig 是 scene 的直接子级 → tilt/spin 的旋转和位置都在世界空间
+  // 这样 pivotOffset 和 axisTilt 不受 modelRot 影响
+  groups.forEach((g, idx) => {
+    // rig Group：scene 子级，世界空间位置
+    const rig = new THREE.Group();
+    rig.name = `_propRig_${idx}`;
+    rig.position.copy(g.center);
+    scene.add(rig);
+    propRigs.push(rig);
+
+    // tilt Group：rig 子级，世界空间旋转（轴倾斜）
+    const tilt = new THREE.Group();
+    tilt.name = `_propTilt_${idx}`;
+    tilt.rotation.x = state.axisTilt.x * Math.PI / 180;
+    tilt.rotation.y = state.axisTilt.y * Math.PI / 180;
+    rig.add(tilt);
+    propTilts.push(tilt);
+
+    // spin Group：tilt 子级，每帧旋转
+    const spin = new THREE.Group();
+    spin.name = `_propSpin_${idx}`;
+    tilt.add(spin);
+    // 更新新组世界矩阵（attach 需要目标的世界矩阵）
+    rig.updateWorldMatrix(true, true);
+    // 恢复累积旋转（避免调整偏移时桨叶跳回初始角度）
+    if (savedQuats[idx]) spin.quaternion.copy(savedQuats[idx]);
+    multiPivots.push(spin);
+
+    // 桨叶挂到 spin（此时旧组仍在场景中，世界位置正确保留）
+    g.blades.forEach(b => spin.attach(b));
+  });
+
+  // attach 完成，现在安全移除旧组（桨叶已转移到新组）
+  oldSpins.forEach(p => p.parent?.remove(p));
+  oldTilts.forEach(t => t.parent?.remove(t));
+  oldRigs.forEach(r => r.parent?.remove(r));
+
+  propPivot = multiPivots[0]; // 兼容引用
+
+  // 创建动态模糊盘面（每个 rig 一个，挂在 tilt 下、spin 的兄弟）
+  createBlurDiscs();
+
+  updateDebugVisuals();
+  updateInfoPanel();
+}
+
+/** 按当前旋转轴计算桨叶投影半径（只取垂直于旋转轴的两个分量） */
+function computeBladeRadius() {
+  if (!propBboxModel) { bladeRadius = 1; return; }
+  const { min, max, center } = propBboxModel;
+  // 8 个角点
+  const corners = [];
+  for (const x of [min.x, max.x])
+    for (const y of [min.y, max.y])
+      for (const z of [min.z, max.z])
+        corners.push({ x, y, z });
+  let maxDist = 0;
+  corners.forEach(c => {
+    let d;
+    if (state.spinAxis === 'z') {
+      // 旋转轴 Z → 投影到 XY 平面，忽略 Z
+      d = Math.hypot(c.x - center.x, c.y - center.y);
+    } else if (state.spinAxis === 'y') {
+      // 旋转轴 Y → 投影到 XZ 平面，忽略 Y
+      d = Math.hypot(c.x - center.x, c.z - center.z);
+    } else {
+      // 旋转轴 X → 投影到 YZ 平面，忽略 X
+      d = Math.hypot(c.y - center.y, c.z - center.z);
+    }
+    if (d > maxDist) maxDist = d;
+  });
+  // 95% 确保不超过桨尖
+  bladeRadius = maxDist * 0.95 || 1;
+}
+
+/** 创建径向渐变纹理（中心透明，中环半透明，边缘渐隐） */
+let _blurTexture = null;
+function getBlurTexture() {
+  if (_blurTexture) return _blurTexture;
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  grad.addColorStop(0.00, 'rgba(200,165,20,0.5)');   // 桨毂头部：黄色
+  grad.addColorStop(0.10, 'rgba(200,165,20,0.35)');  // 桨毂根部：黄色渐淡
+  grad.addColorStop(0.16, 'rgba(10,10,10,0.85)');    // 桨叶起始：黄→黑过渡
+  grad.addColorStop(0.85, 'rgba(12,12,12,0.6)');     // 桨叶扫掠区：纯黑
+  grad.addColorStop(1.00, 'rgba(12,12,12,0)');       // 边缘：渐隐
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  _blurTexture = new THREE.CanvasTexture(canvas);
+  return _blurTexture;
+}
+
+/** 为每个 tilt 创建模糊盘面 */
+function createBlurDiscs() {
+  blurDiscs.forEach(d => d.parent?.remove(d));
+  blurDiscs = [];
+
+  propTilts.forEach((tilt, idx) => {
+    const geo = new THREE.CircleGeometry(bladeRadius, 64);
+    const mat = new THREE.MeshBasicMaterial({
+      map: getBlurTexture(),
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const disc = new THREE.Mesh(geo, mat);
+    // 盘面朝向：垂直于旋转轴
+    if (state.spinAxis === 'y') disc.rotation.x = Math.PI / 2;
+    else if (state.spinAxis === 'x') disc.rotation.y = Math.PI / 2;
+    // 挂到 tilt 下（继承轴倾斜），但不在 spin 下（不随桨叶旋转）
+    tilt.add(disc);
+    blurDiscs.push(disc);
+  });
+  updateBlurOpacity();
+}
+
+/** 根据转速和模糊强度更新盘面透明度 */
+function updateBlurOpacity() {
+  const autoSpeed = document.getElementById('blur-auto-speed')?.checked ?? true;
+  // 转速越高、模糊强度越大 → 盘面越明显
+  const speedFactor = autoSpeed ? Math.min(1, state.spinSpeed / 120) : 1; // 120 rad/s 时达到满效果
+  const opacity = state.motionBlur * speedFactor * 0.6;
+  blurDiscs.forEach(d => {
+    if (d.material) d.material.opacity = opacity;
+    d.visible = opacity > 0.01;
+  });
+}
+
+/** 应用轴倾斜（不重建 pivot，只改 tilt Group 的 rotation） */
+function applyAxisTilt() {
+  propTilts.forEach(t => {
+    t.rotation.x = state.axisTilt.x * Math.PI / 180;
+    t.rotation.y = state.axisTilt.y * Math.PI / 180;
+  });
+  updateDebugVisuals();
+  updateInfoPanel();
+}
+
+// ========== 材质应用 ==========
+function applyOpacity() {
+  blades.forEach(b => {
+    b.traverse(o => {
+      if (!o.isMesh || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach(m => { m.transparent = state.transparent; m.opacity = state.opacity; });
+    });
+  });
+}
+
+function applyWireframe() {
+  const applyTo = (obj) => {
+    if (!obj) return;
+    obj.traverse(o => {
+      if (o.isMesh && o.material) {
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach(m => { m.wireframe = state.wireframe; });
+      }
+    });
+  };
+  if (model) applyTo(model);
+  blades.forEach(b => applyTo(b));
+}
+
+function applyBodyVisibility() {
+  if (!model) return;
+  const bladeSet = new Set(blades);
+  model.traverse(o => {
+    if (!o.isMesh) return;
+    // 判断是否是桨叶 mesh
+    let isBlade = bladeSet.has(o);
+    if (!isBlade) {
+      // 检查是否是桨叶的子 mesh
+      let p = o.parent;
+      while (p) { if (bladeSet.has(p)) { isBlade = true; break; } p = p.parent; }
+    }
+    if (isBlade) return; // 桨叶不受机身显示影响
+
+    if (state.bodyVisibility === 'hidden') o.visible = false;
+    else if (state.bodyVisibility === 'ghost') {
+      o.visible = true;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach(m => { m.transparent = true; m.opacity = 0.15; });
+    } else {
+      o.visible = true;
+      // 恢复不透明（仅 ghost->full 时需要）
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach(m => {
+        if (m._origOpacity != null) { m.opacity = m._origOpacity; m.transparent = m._origTransparent; }
+      });
+    }
+  });
+  // 记录原始 opacity 供 ghost 恢复
+  if (state.bodyVisibility === 'full') {
+    model.traverse(o => {
+      if (o.isMesh && o.material) {
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach(m => {
+          if (m._origOpacity == null) { m._origOpacity = m.opacity; m._origTransparent = m.transparent; }
+        });
+      }
+    });
+  }
+}
+
+// ========== 调试可视化 ==========
+function updateDebugVisuals() {
+  // 桨毂标记
+  pivotMarkers.forEach(m => scene.remove(m));
+  pivotMarkers = [];
+  pivotMarker = null;
+  if (state.showPivotMarker && multiPivots.length) {
+    multiPivots.forEach((p, i) => {
+      const wp = new THREE.Vector3();
+      p.getWorldPosition(wp);
+      const geo = new THREE.SphereGeometry(0.15, 16, 16);
+      const mat = new THREE.MeshBasicMaterial({ color: 0xff3030 });
+      const sphere = new THREE.Mesh(geo, mat);
+      sphere.position.copy(wp);
+      sphere.name = '_pivotMarker_' + i;
+      scene.add(sphere);
+      pivotMarkers.push(sphere);
+      if (i === 0) pivotMarker = sphere;
+    });
+  }
+
+  // 桨叶中心标记
+  bladeCenterMarkers.forEach(m => scene.remove(m));
+  bladeCenterMarkers = [];
+  if (state.showBladeCenters && model) {
+    model.updateWorldMatrix(true, true);
+    blades.forEach(b => {
+      const box = new THREE.Box3().setFromObject(b);
+      const c = new THREE.Vector3();
+      box.getCenter(c);
+      const geo = new THREE.SphereGeometry(0.08, 12, 12);
+      const mat = new THREE.MeshBasicMaterial({ color: 0x30ff60 });
+      const sphere = new THREE.Mesh(geo, mat);
+      sphere.position.copy(c);
+      scene.add(sphere);
+      bladeCenterMarkers.push(sphere);
+    });
+  }
+
+  // 包围盒
+  bboxHelpers.forEach(h => scene.remove(h));
+  bboxHelpers = [];
+  if (state.showBbox && model) {
+    blades.forEach(b => {
+      const box = new THREE.Box3().setFromObject(b);
+      const helper = new THREE.Box3Helper(box, 0x6fd0ff);
+      scene.add(helper);
+      bboxHelpers.push(helper);
+    });
+  }
+
+  // 旋转轴（考虑 tilt 倾斜 + modelRoot 旋转）
+  if (axisHelper) { scene.remove(axisHelper); axisHelper = null; }
+  if (state.showAxis && propTilts.length) {
+    const wp = new THREE.Vector3();
+    propTilts[0].getWorldPosition(wp);
+    const baseAxis = state.spinAxis === 'z' ? new THREE.Vector3(0,0,1) :
+                     state.spinAxis === 'y' ? new THREE.Vector3(0,1,0) :
+                     new THREE.Vector3(1,0,0);
+    // 用 tilt Group 的世界四元数变换基轴，得到真实旋转轴方向
+    const tiltQuat = new THREE.Quaternion();
+    propTilts[0].getWorldQuaternion(tiltQuat);
+    const axisVec = baseAxis.applyQuaternion(tiltQuat);
+    const geo = new THREE.BufferGeometry().setFromPoints([
+      wp.clone().sub(axisVec.clone().multiplyScalar(3)),
+      wp.clone().add(axisVec.clone().multiplyScalar(3)),
+    ]);
+    const mat = new THREE.LineBasicMaterial({ color: 0xffb84d, linewidth: 2 });
+    axisHelper = new THREE.Line(geo, mat);
+    scene.add(axisHelper);
+  }
+}
+
+// ========== 信息面板 ==========
+function updateInfoPanel() {
+  const propInfo = document.getElementById('prop-info');
+  const pivotInfo = document.getElementById('pivot-info');
+  const bladePos = document.getElementById('blade-pos');
+  const modelRotInfo = document.getElementById('model-rot-info');
+
+  // 模型朝向信息
+  if (modelRotInfo) {
+    modelRotInfo.innerHTML =
+      `<div class="row"><span>Pitch X</span><span class="v">${state.modelRot.x.toFixed(1)}°</span></div>` +
+      `<div class="row"><span>Yaw Y</span><span class="v">${state.modelRot.y.toFixed(1)}°</span></div>` +
+      `<div class="row"><span>Roll Z</span><span class="v">${state.modelRot.z.toFixed(1)}°</span></div>`;
+  }
+
+  if (!blades.length) {
+    propInfo.innerHTML = '<span style="color:var(--fire)">未找到桨叶节点</span>';
+    pivotInfo.innerHTML = '-';
+    bladePos.innerHTML = '-';
+    return;
+  }
+
+  // 桨叶信息
+  let html = '';
+  blades.forEach((b, i) => {
+    html += `<div class="row"><span class="prop">[${i}] ${b.name}</span></div>`;
+  });
+  html += `<div class="row"><span>桨叶总数</span><span class="v">${blades.length}</span></div>`;
+  html += `<div class="row"><span>分组模式</span><span class="v">${state.singleGroup ? '单组' : '多组'}</span></div>`;
+  html += `<div class="row"><span>pivot 数量</span><span class="v">${multiPivots.length}</span></div>`;
+  html += `<div class="row"><span>轴倾斜 X</span><span class="v">${state.axisTilt.x.toFixed(1)}°</span></div>`;
+  html += `<div class="row"><span>轴倾斜 Y</span><span class="v">${state.axisTilt.y.toFixed(1)}°</span></div>`;
+  propInfo.innerHTML = html;
+
+  // Pivot 信息（世界空间）
+  if (propRigs.length) {
+    let phtml = '';
+    propRigs.forEach((r, i) => {
+      phtml += `<div class="row"><span class="warn">rig[${i}] 世界坐标</span><span class="v">${r.position.x.toFixed(3)}, ${r.position.y.toFixed(3)}, ${r.position.z.toFixed(3)}</span></div>`;
+      phtml += `<div class="row"><span class="warn">tilt[${i}] 倾斜角</span><span class="v">${state.axisTilt.x.toFixed(1)}°, ${state.axisTilt.y.toFixed(1)}°</span></div>`;
+    });
+    pivotInfo.innerHTML = phtml;
+  } else {
+    pivotInfo.innerHTML = '<span style="color:var(--muted)">未创建</span>';
+  }
+
+  // 桨叶世界坐标
+  if (model) {
+    model.updateWorldMatrix(true, true);
+    let bhtml = '';
+    blades.forEach((b, i) => {
+      const wp = new THREE.Vector3();
+      b.getWorldPosition(wp);
+      bhtml += `<div class="row"><span>[${i}]</span><span class="v">${wp.x.toFixed(2)}, ${wp.y.toFixed(2)}, ${wp.z.toFixed(2)}</span></div>`;
+    });
+    bladePos.innerHTML = bhtml;
+  }
+}
+
+// ========== 状态条 ==========
+function setStatus(msg, cls) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = cls || '';
+}
+
+// ========== UI 绑定 ==========
+function bindUI() {
+  // 模型加载
+  document.getElementById('btn-load').onclick = () => {
+    const url = document.getElementById('model-sel').value;
+    loadModel(url);
+  };
+
+  // ① 模型朝向修正
+  ['x','y','z'].forEach(axis => {
+    const slider = document.getElementById('model-rot-' + axis);
+    const num = document.getElementById('model-rot-' + axis + '-val');
+    const onChange = (v) => {
+      state.modelRot[axis] = parseFloat(v);
+      slider.value = v;
+      num.value = parseFloat(v).toFixed(1);
+      applyModelRotation();
+      // 模型旋转后世界坐标变化，需要重建 pivot（桨叶位置变了）
+      if (blades.length) rebuildPivot();
+    };
+    slider.oninput = () => onChange(slider.value);
+    num.onchange = () => onChange(num.value);
+  });
+
+  // 归零模型旋转
+  document.getElementById('btn-reset-model-rot').onclick = () => {
+    state.modelRot = { x: 0, y: 0, z: 0 };
+    ['x','y','z'].forEach(axis => {
+      document.getElementById('model-rot-' + axis).value = 0;
+      document.getElementById('model-rot-' + axis + '-val').value = 0;
+    });
+    applyModelRotation();
+    if (blades.length) rebuildPivot();
+  };
+
+  // 自动朝向（只算 Yaw）
+  document.getElementById('btn-auto-orient').onclick = () => {
+    state.modelRot = { x: 0, y: 0, z: 0 };
+    ['x','y','z'].forEach(axis => {
+      document.getElementById('model-rot-' + axis).value = 0;
+      document.getElementById('model-rot-' + axis + '-val').value = 0;
+    });
+    autoOrient();
+    if (blades.length) rebuildPivot();
+    setStatus('已自动计算 Yaw 朝向', 'ok');
+  };
+
+  // 世界坐标轴显示
+  document.getElementById('show-world-axis').onchange = e => {
+    if (worldAxisHelper) worldAxisHelper.visible = e.target.checked;
+  };
+
+  // 自动旋转
+  const btnAutoRotate = document.getElementById('btn-auto-rotate');
+  btnAutoRotate.onclick = () => {
+    state.autoRotate = !state.autoRotate;
+    btnAutoRotate.textContent = '自动旋转: ' + (state.autoRotate ? '开' : '关');
+    btnAutoRotate.classList.toggle('prop', state.autoRotate);
+  };
+  document.getElementById('auto-rotate').onchange = e => {
+    state.autoRotate = e.target.checked;
+    btnAutoRotate.textContent = '自动旋转: ' + (state.autoRotate ? '开' : '关');
+  };
+
+  // 重置视角
+  document.getElementById('btn-reset-view').onclick = () => {
+    camera.position.set(8, 4, 12);
+    controls.target.set(0, 0, 0);
+    controls.update();
+  };
+
+  // ===== 导出配置 =====
+  document.getElementById('btn-export').onclick = () => {
+    // 收集当前所有调试参数
+    const cfg = {
+      propSpinSpeed: state.spinSpeed,
+      propOpacity: state.opacity,
+      propBlurDisc: state.motionBlur > 0,
+      propBlurStrength: state.motionBlur,
+      propSpinAxis: state.spinAxis,
+      propAxisTilt: { x: state.axisTilt.x, y: state.axisTilt.y },
+      propPivotOffset: { x: state.pivotOffset.x, y: state.pivotOffset.y, z: state.pivotOffset.z },
+      propModelRot: { x: state.modelRot.x, y: state.modelRot.y, z: state.modelRot.z },
+      propSingleGroup: state.singleGroup,
+    };
+    const json = JSON.stringify(cfg, null, 2);
+    document.getElementById('export-text').value = json;
+    document.getElementById('export-modal').style.display = 'block';
+  };
+
+  // 复制到剪贴板
+  document.getElementById('btn-copy-export').onclick = async () => {
+    const txt = document.getElementById('export-text').value;
+    try {
+      await navigator.clipboard.writeText(txt);
+      document.getElementById('btn-copy-export').textContent = '✓ 已复制';
+      setTimeout(() => {
+        document.getElementById('btn-copy-export').textContent = '复制到剪贴板';
+      }, 1500);
+    } catch (e) {
+      // fallback: 选中文本
+      document.getElementById('export-text').select();
+      document.execCommand('copy');
+      document.getElementById('btn-copy-export').textContent = '✓ 已复制';
+      setTimeout(() => {
+        document.getElementById('btn-copy-export').textContent = '复制到剪贴板';
+      }, 1500);
+    }
+  };
+
+  // 关闭弹窗
+  document.getElementById('btn-close-export').onclick = () => {
+    document.getElementById('export-modal').style.display = 'none';
+  };
+
+  // 转速
+  const spinSpeed = document.getElementById('spin-speed');
+  const spinSpeedVal = document.getElementById('spin-speed-val');
+  spinSpeed.oninput = () => {
+    state.spinSpeed = parseFloat(spinSpeed.value);
+    spinSpeedVal.textContent = state.spinSpeed;
+    updateBlurOpacity();
+  };
+
+  // 旋转轴
+  document.getElementById('spin-axis').onchange = e => {
+    state.spinAxis = e.target.value;
+    // 轴变了，投影半径和盘面朝向都要重建
+    computeBladeRadius();
+    createBlurDiscs();
+    updateDebugVisuals();
+  };
+
+  // Pivot 偏移
+  ['x','y','z'].forEach(axis => {
+    const slider = document.getElementById('pivot-' + axis);
+    const num = document.getElementById('pivot-' + axis + '-val');
+    const onChange = (v) => {
+      state.pivotOffset[axis] = parseFloat(v);
+      slider.value = v;
+      num.value = v;
+      rebuildPivot();
+    };
+    slider.oninput = () => onChange(slider.value);
+    num.onchange = () => onChange(num.value);
+  });
+
+  // 轴倾斜修正
+  ['x','y'].forEach(axis => {
+    const slider = document.getElementById('tilt-' + axis);
+    const num = document.getElementById('tilt-' + axis + '-val');
+    const onChange = (v) => {
+      state.axisTilt[axis] = parseFloat(v);
+      slider.value = v;
+      num.value = v;
+      applyAxisTilt();
+    };
+    slider.oninput = () => onChange(slider.value);
+    num.onchange = () => onChange(num.value);
+  });
+
+  // 归零倾斜
+  document.getElementById('btn-reset-tilt').onclick = () => {
+    state.axisTilt = { x: 0, y: 0 };
+    ['x','y'].forEach(axis => {
+      document.getElementById('tilt-' + axis).value = 0;
+      document.getElementById('tilt-' + axis + '-val').value = 0;
+    });
+    applyAxisTilt();
+  };
+
+  // 显示旋转轴快捷按钮
+  const btnShowAxis = document.getElementById('btn-show-axis');
+  const chkShowAxis = document.getElementById('show-axis');
+  btnShowAxis.onclick = () => {
+    chkShowAxis.checked = !chkShowAxis.checked;
+    state.showAxis = chkShowAxis.checked;
+    btnShowAxis.textContent = state.showAxis ? '隐藏旋转轴' : '显示旋转轴';
+    btnShowAxis.classList.toggle('active', state.showAxis);
+    updateDebugVisuals();
+  };
+
+  // 重新计算质心
+  document.getElementById('btn-recompute-pivot').onclick = () => {
+    state.pivotOffset = { x: 0, y: 0, z: 0 };
+    ['x','y','z'].forEach(axis => {
+      document.getElementById('pivot-' + axis).value = 0;
+      document.getElementById('pivot-' + axis + '-val').value = 0;
+    });
+    rebuildPivot();
+    setStatus('已重新计算桨毂质心（偏移归零）', 'ok');
+  };
+
+  // 归零偏移
+  document.getElementById('btn-reset-pivot').onclick = () => {
+    state.pivotOffset = { x: 0, y: 0, z: 0 };
+    ['x','y','z'].forEach(axis => {
+      document.getElementById('pivot-' + axis).value = 0;
+      document.getElementById('pivot-' + axis + '-val').value = 0;
+    });
+    rebuildPivot();
+  };
+
+  // 透明度
+  const opacitySlider = document.getElementById('opacity');
+  const opacityVal = document.getElementById('opacity-val');
+  opacitySlider.oninput = () => {
+    state.opacity = parseFloat(opacitySlider.value);
+    opacityVal.textContent = state.opacity.toFixed(2);
+  };
+  document.getElementById('btn-apply-opacity').onclick = applyOpacity;
+  document.getElementById('transparent').onchange = e => {
+    state.transparent = e.target.checked;
+    applyOpacity();
+  };
+
+  // 动态模糊
+  const blurSlider = document.getElementById('motion-blur');
+  const blurVal = document.getElementById('motion-blur-val');
+  blurSlider.oninput = () => {
+    state.motionBlur = parseFloat(blurSlider.value);
+    blurVal.textContent = state.motionBlur.toFixed(2);
+    updateBlurOpacity();
+  };
+  document.getElementById('blur-auto-speed').onchange = () => updateBlurOpacity();
+
+  // 分组模式
+  const btnSingle = document.getElementById('btn-single-group');
+  const btnMulti = document.getElementById('btn-multi-group');
+  btnSingle.onclick = () => {
+    state.singleGroup = true;
+    btnSingle.classList.add('active');
+    btnMulti.classList.remove('active');
+    recomputeBaseCenters();
+    rebuildPivot();
+  };
+  btnMulti.onclick = () => {
+    state.singleGroup = false;
+    btnMulti.classList.add('active');
+    btnSingle.classList.remove('active');
+    recomputeBaseCenters();
+    rebuildPivot();
+  };
+
+  // 调试可视化
+  document.getElementById('show-pivot-marker').onchange = e => {
+    state.showPivotMarker = e.target.checked;
+    updateDebugVisuals();
+  };
+  document.getElementById('show-blade-centers').onchange = e => {
+    state.showBladeCenters = e.target.checked;
+    updateDebugVisuals();
+  };
+  document.getElementById('show-bbox').onchange = e => {
+    state.showBbox = e.target.checked;
+    updateDebugVisuals();
+  };
+  document.getElementById('show-axis').onchange = e => {
+    state.showAxis = e.target.checked;
+    const btn = document.getElementById('btn-show-axis');
+    btn.textContent = state.showAxis ? '隐藏旋转轴' : '显示旋转轴';
+    btn.classList.toggle('active', state.showAxis);
+    updateDebugVisuals();
+  };
+  document.getElementById('wireframe').onchange = e => {
+    state.wireframe = e.target.checked;
+    applyWireframe();
+  };
+
+  // 背景色
+  document.getElementById('bg-color').oninput = e => {
+    scene.background = new THREE.Color(e.target.value);
+  };
+
+  // 机身显示
+  document.getElementById('body-visibility').onchange = e => {
+    state.bodyVisibility = e.target.value;
+    applyBodyVisibility();
+  };
+}
+
+// ========== 主循环 ==========
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+
+  // 旋转桨叶
+  if (state.autoRotate && multiPivots.length) {
+    const angle = state.spinSpeed * dt;
+    multiPivots.forEach(p => {
+      if (state.spinAxis === 'z') p.rotateZ(angle);
+      else if (state.spinAxis === 'y') p.rotateY(angle);
+      else p.rotateX(angle);
+    });
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ========== 启动 ==========
+init();
+bindUI();
+animate();
+// 自动加载喷火式
+loadModel('/model/spitfire.glb');
+</script>
+</body>
+</html>

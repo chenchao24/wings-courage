@@ -1,0 +1,492 @@
+import * as THREE from 'three';
+import { Enemy } from '../enemy.js';
+
+/**
+ * 波次导演（P4）：按关卡 waves 配置刷有限波次，取代旧版无限重生。
+ *
+ * 状态机：idle → spawning → active → clearing → （下一波 spawning | done）
+ *   idle      等待 startDelay（教学系统关闭后调 skipStartDelay 立即开始）
+ *   spawning  异步创建本波敌机（solo 1 架 / pair 2 架编队），完成后切 active
+ *   active    等待本波全灭（所有敌机 _exploded && _crashTimer<=0）
+ *   clearing  释放本波敌机资源，等待 delayAfterWave 后进下一波或 done
+ *   done      全部波次清除，触发 onAllClear
+ *
+ * 全灭检测约定（aircraft.js autoRespawn=false）：敌机触地爆炸后 _exploded=true、
+ * _crashTimer 倒计时归零但不自动 reset，由本导演统一释放并刷下一波。
+ *
+ * 编队（pair）：长机 isLeader + 僚机 wingman 互引，僚机对齐长机 body frame
+ * 编队偏移(40,-10,30)，两机 combatState='formation'（受击散开由 Enemy.takeDamage override 处理）。
+ *
+ * 回调接口（callbacks）：
+ *   onWaveStart(idx, wave)     波次开始（即将刷怪）
+ *   onWaveSpawned(idx, wave)   本波敌机加载完成已就位
+ *   onWaveCleared(idx)         本波全灭
+ *   onAllClear()               全部波次清除
+ *   onEnemySmoking(enemy)      敌机首次冒烟（HP≤smokeThreshold，去重）
+ *   onEnemyKilled(enemy)       敌机被击落（HP 归零）
+ *   disposeEnemy(enemy)        释放单个敌机资源（由 GameRuntime._disposeAircraft 实现）
+ */
+const ENEMY_MODEL_DEFAULT = '/model/yak9.glb';
+
+export class WaveDirector {
+  /**
+   * @param {{scene,renderer,env,player}} ctx
+   * @param {object} callbacks 回调集合
+   */
+  constructor(ctx, callbacks) {
+    this.ctx = ctx;
+    this.cb = callbacks || {};
+
+    this.waves = [];
+    this.opts = {};
+    this.enemyModel = ENEMY_MODEL_DEFAULT;
+
+    this.state = 'idle';
+    this.currentWaveIdx = -1;
+    this.totalWaves = 0;
+    this.killed = 0;
+    this.target = 0;
+
+    this._activeEnemies = [];
+    this._smokingNotified = new WeakSet();
+    this._counted = new WeakSet();  // 已计入 killed 的敌机（去重，含玩家击落与自己坠地）
+    this._timer = 0;
+    this._disposed = false;
+
+    // IL-2 循环波次（第3波专属：循环刷新4架/组直到击落 killTarget 架）
+    this._il2WaveCfg = null;      // wave.il2Wave 配置
+    this._il2Killed = 0;          // IL-2 击落计数
+    this._il2Retreating = false;  // 撤退已触发
+  }
+
+  /**
+   * 启动波次序列。
+   * @param {Array<{formation:'solo'|'pair',count:number,entry?:string,label?:string}>} waves
+   * @param {{startDelay?:number, delayAfterWave?:number}} opts
+   * @param {string} [enemyModel] 敌机模型 URL
+   */
+  start(waves, opts = {}, enemyModel) {
+    this.waves = waves || [];
+    this.opts = opts || {};
+    if (enemyModel) this.enemyModel = enemyModel;
+    this.totalWaves = this.waves.length;
+    this.target = this.waves.reduce(
+      (s, w) => s + (w.count || (w.formation === 'pair' ? 2 : (w.formation === 'trio' ? 3 : (w.formation === 'double-pair' ? 4 : 1)))),
+      0,
+    );
+    this.state = 'idle';
+    this.currentWaveIdx = -1;
+    this.killed = 0;
+    this._timer = this.opts.startDelay || 0;
+
+    if (this.totalWaves === 0) {
+      this.state = 'done';
+      if (this.cb.onAllClear) this.cb.onAllClear();
+    }
+  }
+
+  /** 当前活跃敌机（含坠毁中未释放的） */
+  get activeEnemies() { return this._activeEnemies; }
+  /** 当前波次（1-based） */
+  get currentWave() { return this.currentWaveIdx + 1; }
+
+  getState() {
+    return {
+      state: this.state,
+      currentWave: this.currentWave,
+      totalWaves: this.totalWaves,
+      killed: this.killed,
+      target: this.target,
+    };
+  }
+
+  /** 教学系统关闭后跳过 startDelay，延迟 delay 秒后开始首波 */
+  skipStartDelay(delay = 0) {
+    if (this.state === 'idle' && this.currentWaveIdx < 0) {
+      this._timer = delay;
+    }
+  }
+
+  update(dt) {
+    if (this._disposed || this.state === 'done') return;
+
+    if (this.state === 'idle') {
+      this._timer -= dt;
+      if (this._timer <= 0) this._beginWave(0);
+      return;
+    }
+
+    if (this.state === 'spawning') {
+      // _beginWave 异步创建，完成后自行切 active
+      return;
+    }
+
+    if (this.state === 'active') {
+      // IL-2 循环波次特殊处理
+      if (this._il2WaveCfg) {
+        this._updateIl2Wave(dt);
+        return;
+      }
+      // 坠毁计战果：检测 _exploded 且未被计数（非 IL-2 波次通用）
+      for (const e of this._activeEnemies) {
+        if (e._exploded && !this._counted.has(e)) {
+          this.notifyKilled(e);
+        }
+      }
+      // 全灭检测：所有活跃敌机都已爆炸且倒计时归零，或已请求脱离（轰炸机飞抵终点）
+      const allDone = this._activeEnemies.length > 0 &&
+        this._activeEnemies.every((e) => (e._exploded && e._crashTimer <= 0) || e._despawnRequested);
+      if (allDone) {
+        if (this.cb.onWaveCleared) this.cb.onWaveCleared(this.currentWaveIdx);
+        this._releaseActive();
+        this.state = 'clearing';
+        this._timer = this.opts.delayAfterWave != null ? this.opts.delayAfterWave : 1.5;
+      }
+      return;
+    }
+
+    if (this.state === 'clearing') {
+      this._timer -= dt;
+      if (this._timer <= 0) {
+        const next = this.currentWaveIdx + 1;
+        if (next < this.totalWaves) this._beginWave(next);
+        else {
+          this.state = 'done';
+          if (this.cb.onAllClear) this.cb.onAllClear();
+        }
+      }
+      return;
+    }
+  }
+
+  _beginWave(idx) {
+    this.currentWaveIdx = idx;
+    this.state = 'spawning';
+    const wave = this.waves[idx];
+    if (this.cb.onWaveStart) this.cb.onWaveStart(idx, wave);
+
+    // IL-2 循环波次：初始化计数 + 用特殊刷新逻辑
+    if (wave && wave.il2Wave) {
+      this._il2WaveCfg = wave.il2Wave;
+      this._il2Killed = 0;
+      this._il2Retreating = false;
+      this._spawnIl2Group(wave).then(() => {
+        if (this._disposed) return;
+        this.state = 'active';
+        if (this.cb.onWaveSpawned) this.cb.onWaveSpawned(idx, wave);
+      }).catch((err) => { console.error('[WaveDirector] IL-2 刷怪失败:', err); });
+      return;
+    }
+
+    this._spawnWave(wave).then(() => {
+      if (this._disposed) return;
+      this.state = 'active';
+      if (this.cb.onWaveSpawned) this.cb.onWaveSpawned(idx, wave);
+    }).catch((err) => {
+      console.error('[WaveDirector] 波次刷怪失败:', err);
+    });
+  }
+
+  async _spawnWave(wave) {
+    if (!wave) return;
+    if (wave.formation === 'double-pair') {
+      // 双双机编队（4 架）：2 个 pair，每个 pair 长机 + 僚机
+      // 第二组偏移到第一组侧后方（避免重叠）
+      // pairOffset 支持普通对象 {x,y,z} 或 Vector3（关卡配置里是普通对象）
+      const po = wave.pairOffset;
+      const pairOffset = po
+        ? new THREE.Vector3(po.x || 0, po.y || 0, po.z || 0)
+        : new THREE.Vector3(-200, 0, 100); // body frame 偏移
+      // 第一组
+      const leader1 = await this._createEnemy(wave);
+      const wing1 = await this._createEnemy(wave);
+      leader1.isLeader = true;
+      wing1.isLeader = false;
+      wing1.wingman = leader1;
+      leader1.wingman = wing1;
+      const off1 = leader1.formationOffset.clone().applyQuaternion(leader1.root.quaternion);
+      wing1.root.position.copy(leader1.root.position).add(off1);
+      wing1.root.quaternion.copy(leader1.root.quaternion);
+      // 有 _spawnBehavior（loiter）时保留 reset() 设的 'loiter' 状态，不覆盖为 'formation'
+      if (!leader1._spawnBehavior) leader1.combatState = 'formation';
+      if (!wing1._spawnBehavior) wing1.combatState = 'formation';
+      this._activeEnemies.push(leader1, wing1);
+      // 第二组（偏移到第一组侧后方）
+      const leader2 = await this._createEnemy(wave);
+      const wing2 = await this._createEnemy(wave);
+      leader2.isLeader = true;
+      wing2.isLeader = false;
+      wing2.wingman = leader2;
+      leader2.wingman = wing2;
+      // 第二组长机定位到第一组长机侧后方
+      const off2 = pairOffset.clone().applyQuaternion(leader1.root.quaternion);
+      leader2.root.position.copy(leader1.root.position).add(off2);
+      leader2.root.quaternion.copy(leader1.root.quaternion);
+      const off2w = leader2.formationOffset.clone().applyQuaternion(leader2.root.quaternion);
+      wing2.root.position.copy(leader2.root.position).add(off2w);
+      wing2.root.quaternion.copy(leader2.root.quaternion);
+      if (!leader2._spawnBehavior) leader2.combatState = 'formation';
+      if (!wing2._spawnBehavior) wing2.combatState = 'formation';
+      this._activeEnemies.push(leader2, wing2);
+    } else if (wave.formation === 'trio') {
+      // 三机 V 字编队：长机居中前，左右僚机后撤 V 字（轰炸机编队专用）
+      // 长机按 _route 航线直飞，僚机跟随长机 body frame 偏移（左右各一架）
+      const leader = await this._createEnemy(wave);
+      const wingL = await this._createEnemy(wave);
+      const wingR = await this._createEnemy(wave);
+      leader.isLeader = true;
+      wingL.isLeader = false;
+      wingR.isLeader = false;
+      // V 字编队偏移（body frame: 左僚机左后、右僚机右后，间距匹配轰炸机尺寸）
+      // He 111 翼展约 72 单位，间距 130 避免重叠，后撤 70 形成 V 字
+      const offL = new THREE.Vector3(-130, 0, 70).applyQuaternion(leader.root.quaternion);
+      const offR = new THREE.Vector3( 130, 0, 70).applyQuaternion(leader.root.quaternion);
+      wingL.root.position.copy(leader.root.position).add(offL);
+      wingR.root.position.copy(leader.root.position).add(offR);
+      wingL.root.quaternion.copy(leader.root.quaternion);
+      wingR.root.quaternion.copy(leader.root.quaternion);
+      // 僚机各自独立按同一航线飞行（不挂 wingman，避免轰炸机 _thinkBomber
+      // 的僚机跟随逻辑把僚机拉向长机当前位置而非航线）
+      leader.combatState = 'formation';
+      wingL.combatState = 'formation';
+      wingR.combatState = 'formation';
+      this._activeEnemies.push(leader, wingL, wingR);
+    } else if (wave.formation === 'pair') {
+      // 双机编队：长机 + 僚机（并行加载后僚机对齐长机编队偏移）
+      const leader = await this._createEnemy(wave);
+      const wing = await this._createEnemy(wave);
+      leader.isLeader = true;
+      wing.isLeader = false;
+      wing.wingman = leader;   // 僚机的 wingman = 长机（_thinkFormation 据此跟随）
+      leader.wingman = wing;   // 长机的 wingman = 僚机（_thinkEngaged 据此判断支援）
+      // 松散编队：wave 配 looseFormation=true 时用更宽的编队偏移（右120/下20/后80）
+      if (wave.looseFormation) {
+        leader.formationOffset.set(120, -20, 80);
+        wing.formationOffset.set(120, -20, 80);  // 僚机跟随用自身 formationOffset，必须同步设
+      }
+      // 僚机定位到长机 body frame 编队偏移
+      const off = leader.formationOffset.clone().applyQuaternion(leader.root.quaternion);
+      wing.root.position.copy(leader.root.position).add(off);
+      wing.root.quaternion.copy(leader.root.quaternion);
+      // breakOnSpawn: 出生即散开（远距离出生如 7000m，无需保持编队队形）
+      // true -> combatState='engaged' + 清除 wingman 引用（完全独立，不互相支援）
+      // false -> 'formation'（保持编队飞行直到接近散开，wingman 引用保留用于支援）
+      if (wave.breakOnSpawn) {
+        leader.combatState = 'engaged';
+        wing.combatState = 'engaged';
+        leader.wingman = null;  // 清除引用，避免 _thinkEngaged 互相支援导致动作一致
+        wing.wingman = null;
+      } else {
+        leader.combatState = 'formation';
+        wing.combatState = 'formation';
+      }
+      this._activeEnemies.push(leader, wing);
+    } else {
+      // 单机：solo 巡逻 + 规避 + 低欲望攻击
+      const e = await this._createEnemy(wave);
+      e.isLeader = false;
+      // 本关自定义出生行为时保留 'loiter' 状态（reset 已设），否则默认 solo
+      if (!e._spawnBehavior && !e._route) e.combatState = 'solo';
+      this._activeEnemies.push(e);
+    }
+  }
+
+  /**
+   * 创建一架敌机并加载模型。
+   * @param {object} [wave] 波次配置：
+   *   - wave.model: 敌机模型 URL（已有）
+   *   - wave.type:  AI 类型 'fighter'|'bomber'|'transport'|'attacker'|'diveBomber'，默认 'fighter'
+   *   - wave.tier:  难度分层 'normal'|'elite'，默认 'normal'
+   *   - wave.route: 航线点列表 [{x,y,z},...]（轰炸机平飞直航到终点后脱离）
+   */
+  async _createEnemy(wave) {
+    const modelUrl = (wave && wave.model) || this.enemyModel;
+    const aiType = (wave && wave.type) || 'fighter';
+    const aiTier = (wave && wave.tier) || 'normal';
+    const e = new Enemy(this.ctx.scene, this.ctx.renderer, this.ctx.player);
+    e.autoRespawn = false; // 关卡模式：坠毁后不自动重生，由本导演释放并刷下一波
+    e.setTerrain(this.ctx.env.terrain);
+    e.setObstacles(this.ctx.env.obstacles);
+    if (this.ctx.groundTargets) e.setGroundTargets(this.ctx.groundTargets);
+    e._applyAiConfig(aiType, aiTier); // 在 load 之前注入 AI 配置（与 _applyModelConfig 同时机）
+    // 本关 AI 参数覆盖（关卡隔离：覆盖 _aiCfg 任意字段，只影响本关）
+    if (wave && wave.aiOverride) {
+      e.setAiOverride(wave.aiOverride);
+    }
+    // 本关自定义出生行为（spawn/loiter），由 wave 配置注入；无配置时走原逻辑（玩家前方出生）
+    if (wave && (wave.spawn || wave.loiter)) {
+      e.setSpawnBehavior({ spawn: wave.spawn, loiter: wave.loiter });
+    }
+    // 本关自定义出生高度区间 [minY,maxY] 绝对高度；无配置时走原逻辑（相对玩家 ±100m）
+    if (wave && wave.spawnAlt) {
+      e.setSpawnAltitude(wave.spawnAlt);
+    }
+    // 本关自定义出生距离（玩家前方多少米）；无配置时走原逻辑 1400-1900
+    if (wave && wave.spawnDist) {
+      e.setSpawnDistance(wave.spawnDist);
+    }
+    // 航线直飞（轰炸机专用）：按 route 航点平飞，到达终点后脱离消失
+    if (wave && wave.route) {
+      e.setRoute(wave.route);
+    }
+    await e.load(modelUrl);
+    return e;
+  }
+
+  /** 首次冒烟通知（WeakSet 去重，避免每帧重复触发） */
+  notifySmoking(enemy) {
+    if (this._smokingNotified.has(enemy)) return;
+    this._smokingNotified.add(enemy);
+    if (this.cb.onEnemySmoking) this.cb.onEnemySmoking(enemy);
+  }
+
+  /** 玩家击落通知 + 累计计数（去重，触发 onEnemyKilled 击落对话）*/
+  notifyKilled(enemy) {
+    if (this._counted.has(enemy)) return;
+    this._counted.add(enemy);
+    this.killed++;
+    // IL-2 单独计数
+    if (enemy._il2State) this._il2Killed++;
+    if (this.cb.onEnemyKilled) this.cb.onEnemyKilled(enemy);
+  }
+
+  /**
+   * IL-2 循环波次更新（每帧调）：
+   * - 坠毁计战果（检测 _exploded 调 notifyKilled）
+   * - 撤退成功判定（距离>10000m 持续5s 或 到边界）→ 消失，不计战果
+   * - 击落达 killTarget → 触发剩余 IL-2 撤退
+   * - 所有 IL-2 消失 → 击落达标则波次完成，否则再刷一组
+   */
+  _updateIl2Wave(dt) {
+    const cfg = this._il2WaveCfg;
+    const player = this.ctx.player;
+
+    for (const e of this._activeEnemies) {
+      if (e._despawnRequested) continue;
+
+      // 坠毁计战果：检测 _exploded 且未被计数（被击落 HP=0 已由 GameRuntime notifyKilled 计数）
+      if (e._exploded && !this._counted.has(e)) {
+        this.notifyKilled(e);
+      }
+      if (e._exploded) continue;
+
+      const p = e.root.position;
+
+      // 撤退成功判定：撤退中距离 > 10000m 持续 5s → 消失（不计战果）
+      if (e._il2State === 'retreat' && player && player.root) {
+        const distP = p.distanceTo(player.root.position);
+        if (distP > 10000) {
+          e._retreatEscapeTimer = (e._retreatEscapeTimer || 0) + dt;
+          if (e._retreatEscapeTimer > 5) {
+            e._retreatSuccess = true;
+            e._despawnRequested = true;
+          }
+        } else {
+          e._retreatEscapeTimer = 0;
+        }
+      }
+
+      // 飞到边界 → 撤退成功（不计战果）
+      if (Math.abs(p.x) > cfg.despawnBoundary || Math.abs(p.z) > cfg.despawnBoundary) {
+        if (e._il2State === 'retreat') e._retreatSuccess = true;
+        e._despawnRequested = true;
+      }
+    }
+
+    // 击落达标 → 触发剩余 IL-2 撤退
+    if (this._il2Killed >= cfg.killTarget && !this._il2Retreating) {
+      this._il2Retreating = true;
+      for (const e of this._activeEnemies) {
+        if (!e._exploded && !e._despawnRequested && e._il2State) {
+          e._il2State = 'retreat';
+        }
+      }
+    }
+
+    // 所有 IL-2 消失（击落/坠毁/撤退成功）
+    const allGone = this._activeEnemies.length > 0 &&
+      this._activeEnemies.every((e) => (e._exploded && e._crashTimer <= 0) || e._despawnRequested);
+
+    if (allGone) {
+      if (this._il2Killed >= cfg.killTarget) {
+        // 击落达标 → 波次完成
+        if (this.cb.onWaveCleared) this.cb.onWaveCleared(this.currentWaveIdx);
+        this._releaseActive();
+        this._il2WaveCfg = null;
+        this.state = 'clearing';
+        this._timer = this.opts.delayAfterWave != null ? this.opts.delayAfterWave : 1.5;
+      } else {
+        // 击落未达标 → 再刷一组
+        this._releaseActive();
+        this.state = 'spawning';
+        const wave = this.waves[this.currentWaveIdx];
+        this._spawnIl2Group(wave).then(() => {
+          if (this._disposed) return;
+          this.state = 'active';
+        }).catch((err) => { console.error('[WaveDirector] IL-2 循环刷怪失败:', err); });
+      }
+    }
+  }
+
+  /**
+   * IL-2 刷新一组（4架，2个编队，从 spawnPoints 随机选2个点）。
+   */
+  async _spawnIl2Group(wave) {
+    const cfg = this._il2WaveCfg;
+    // 从刷新点随机选2个
+    const pts = cfg.spawnPoints.slice();
+    const selected = [];
+    for (let i = 0; i < 2 && pts.length > 0; i++) {
+      const idx = Math.floor(Math.random() * pts.length);
+      selected.push(pts.splice(idx, 1)[0]);
+    }
+
+    for (const pt of selected) {
+      const leader = await this._createEnemy(wave);
+      const wing = await this._createEnemy(wave);
+      leader.isLeader = true;
+      wing.isLeader = false;
+      wing.wingman = leader;
+      leader.wingman = wing;
+      // 出生位置：刷新点 + 随机高度 400-600m
+      const alt = (wave.spawnAlt) ? wave.spawnAlt[0] + Math.random() * (wave.spawnAlt[1] - wave.spawnAlt[0]) : 500;
+      leader.root.position.set(pt.x, alt, pt.z);
+      // 记录出生点（撤退时先飞回出生点，再飞向苏军边界）
+      leader._il2SpawnPos = leader.root.position.clone();
+      // 朝向巡逻区域（南方 z负）
+      leader.root.quaternion.identity();
+      // IL-2 松散编队：间距加大（右120/下20/后80，距离约150m）+ 随机高度差
+      const il2Off = new THREE.Vector3(120, -20, 80).applyQuaternion(leader.root.quaternion);
+      wing.root.position.copy(leader.root.position).add(il2Off);
+      wing.root.position.y += Math.random() * 50 - 25;
+      wing._il2SpawnPos = wing.root.position.clone();
+      wing.formationOffset.set(120, -20, 80);
+      wing.root.quaternion.copy(leader.root.quaternion);
+      // IL-2 不走战斗机编队 AI（_thinkIl2 独立飞行），combatState 设 solo
+      leader.combatState = 'solo';
+      wing.combatState = 'solo';
+      this._activeEnemies.push(leader, wing);
+    }
+  }
+
+  _releaseActive() {
+    for (const e of this._activeEnemies) {
+      // 补计未被玩家击落但已坠毁的敌机（AI 撞地/失控等），
+      // 计入任务完成度但不触发 onEnemyKilled（非玩家击落，无"击落敌机"对话）
+      if (!this._counted.has(e) && e._exploded) {
+        this._counted.add(e);
+        this.killed++;
+        if (e._il2State) this._il2Killed++;
+      }
+      this._smokingNotified.delete(e);
+      if (this.cb.disposeEnemy) this.cb.disposeEnemy(e);
+    }
+    this._activeEnemies = [];
+  }
+
+  dispose() {
+    this._disposed = true;
+    this._releaseActive();
+    this._activeEnemies = [];
+  }
+}

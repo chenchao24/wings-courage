@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模型预处理工具 · 飞机校准台</title>
+<style>
+  :root {
+    --panel: rgba(12, 18, 22, 0.90);
+    --panel-solid: #0c1216;
+    --line: rgba(120, 180, 210, 0.30);
+    --line-strong: rgba(120, 180, 210, 0.55);
+    --accent: #6fd0ff;
+    --warn: #ffb84d;
+    --fire: #ff5a4d;
+    --text: #d7e6ee;
+    --muted: #8aa0ad;
+    --prop: #6fff8a;
+    --gear: #ff5a4d;
+    --muz: #ffb84d;
+    --bg: #05080a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; font-size: 13px; }
+  #scene { display: block; width: 100vw; height: 100vh; }
+
+  /* ===== 顶栏 ===== */
+  #topbar { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 11;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 22px;
+    padding: 6px 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: 96vw; }
+  #topbar label { color: var(--muted); font-size: 12px; }
+  #topbar select { background: rgba(0,0,0,.4); color: var(--accent); border: 1px solid var(--line);
+    border-radius: 4px; padding: 4px 8px; font-size: 13px; cursor: pointer; max-width: 220px; }
+  #topbar button { background: rgba(111,208,255,.10); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--text); padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  #topbar button:hover { background: rgba(111,208,255,.22); }
+  #topbar button.go { background: var(--accent); color: #05080a; font-weight: 600; }
+  #topbar button.prop { color: var(--prop); border-color: rgba(111,255,138,.4); }
+  #topbar button.warn { color: var(--warn); border-color: rgba(255,184,77,.4); }
+  #topbar small { color: var(--muted); font-size: 11px; }
+  #topbar .sep { color: var(--line-strong); margin: 0 2px; }
+
+  /* ===== 左侧节点列表 ===== */
+  #node-panel { position: fixed; top: 60px; left: 10px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    width: 300px; max-height: calc(100vh - 80px); display: flex; flex-direction: column; }
+  #node-panel .header { padding: 8px 12px; border-bottom: 1px solid var(--line);
+    color: var(--accent); font-size: 12px; letter-spacing: 1px; display: flex; justify-content: space-between; align-items: center; }
+  #node-panel .header .count { color: var(--muted); font-size: 10px; }
+  #node-panel .toolbar { padding: 6px 10px; border-bottom: 1px solid var(--line);
+    display: flex; gap: 4px; flex-wrap: wrap; }
+  #node-panel .toolbar button { background: rgba(255,255,255,.05); border: 1px solid var(--line);
+    border-radius: 3px; color: var(--muted); padding: 2px 7px; font-size: 10px; cursor: pointer; }
+  #node-panel .toolbar button:hover { background: rgba(111,208,255,.15); color: var(--accent); }
+  #node-panel .toolbar input { background: rgba(0,0,0,.4); border: 1px solid var(--line); color: var(--text);
+    border-radius: 3px; padding: 2px 6px; font-size: 10px; flex: 1; min-width: 60px; }
+  #node-list { flex: 1; overflow-y: auto; padding: 4px 0; max-height: calc(100vh - 200px); }
+  .node-row { padding: 3px 12px; display: flex; align-items: center; gap: 5px;
+    cursor: pointer; border-bottom: 1px solid rgba(120,180,210,.06); }
+  .node-row:hover { background: rgba(111,208,255,.08); }
+  .node-row.selected { background: rgba(111,208,255,.20); }
+  .node-row.prop { background: rgba(111,255,138,.10); }
+  .node-row.prop.selected { background: rgba(111,255,138,.22); }
+  .node-row.gear { background: rgba(255,90,77,.10); }
+  .node-row.gear.selected { background: rgba(255,90,77,.22); }
+  .node-row.hidden-node { opacity: 0.4; }
+  .node-row input[type=checkbox] { margin: 0; cursor: pointer; flex-shrink: 0; }
+  .node-row .name { flex: 1; font-family: Consolas, monospace; font-size: 10px; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node-row .info { color: var(--muted); font-size: 9px; font-family: Consolas, monospace; flex-shrink: 0; }
+  .node-row .tag { font-size: 8px; padding: 1px 4px; border-radius: 2px; flex-shrink: 0; font-weight: 600; }
+  .tag.prop { background: var(--prop); color: #05080a; }
+  .tag.gear { background: var(--gear); color: #fff; }
+
+  /* ===== 右侧 Tab 面板 ===== */
+  #panel { position: fixed; top: 60px; right: 10px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    width: 360px; max-height: calc(100vh - 80px); display: flex; flex-direction: column;
+    backdrop-filter: blur(6px); }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .tabs button { flex: 1; background: transparent; border: none; color: var(--muted);
+    padding: 8px 4px; font-size: 11px; cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all .15s; }
+  .tabs button:hover { color: var(--text); background: rgba(111,208,255,.06); }
+  .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(111,208,255,.08); }
+  .tab-content { display: none; padding: 10px 12px; overflow-y: auto; flex: 1; }
+  .tab-content.active { display: block; }
+  .tab-content h4 { color: var(--accent); letter-spacing: 1px; margin: 12px 0 6px; font-size: 11px;
+    border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+  .tab-content h4:first-child { margin-top: 0; }
+  .tab-content h4 .sub { color: var(--muted); font-size: 10px; font-weight: normal; letter-spacing: 0; float: right; }
+  .ctrl { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .ctrl label { width: 72px; color: var(--muted); font-size: 11px; }
+  .ctrl input[type=range] { flex: 1; min-width: 50px; }
+  .ctrl .val { width: 56px; text-align: right; color: var(--accent); font-variant-numeric: tabular-nums; font-size: 11px; }
+  .ctrl input[type=number].val {
+    background: rgba(0,0,0,.4); border: 1px solid var(--line); border-radius: 3px;
+    padding: 2px 4px; font-size: 11px; font-family: Consolas, monospace; color: var(--accent); }
+  .ctrl input[type=number].val:focus { outline: none; border-color: var(--accent); }
+  .ctrl select { flex: 1; background: rgba(0,0,0,.4); color: var(--accent);
+    border: 1px solid var(--line); border-radius: 3px; padding: 2px 6px; font-size: 11px; }
+  .btn-row { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0; }
+  .btn-row button { background: rgba(111,208,255,.10); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--text); padding: 4px 8px; font-size: 10px; cursor: pointer; flex: 1; min-width: 60px; }
+  .btn-row button:hover { background: rgba(111,208,255,.22); }
+  .btn-row button.active { background: var(--accent); color: #05080a; font-weight: 600; }
+  .btn-row button.prop { color: var(--prop); border-color: rgba(111,255,138,.4); }
+  .btn-row button.gear { color: var(--gear); border-color: rgba(255,90,77,.4); }
+  .btn-row button.muz { color: var(--muz); border-color: rgba(255,184,77,.4); }
+  .btn-row button.warn { color: var(--warn); border-color: rgba(255,184,77,.4); }
+  .btn-row button.go { background: var(--accent); color: #05080a; font-weight: 600; }
+  .check { display: flex; align-items: center; gap: 6px; margin: 4px 0; cursor: pointer; font-size: 11px; }
+  .check input { margin: 0; }
+  .check label { color: var(--muted); cursor: pointer; }
+  .hint-text { font-size: 10px; color: var(--muted); line-height: 1.5; margin: 4px 0; padding: 6px 8px;
+    background: rgba(0,0,0,.25); border-radius: 4px; border-left: 2px solid var(--line); }
+  .hint-text b { color: var(--accent); }
+  .hint-text .prop { color: var(--prop); }
+  .hint-text .gear { color: var(--gear); }
+  .hint-text .muz { color: var(--muz); }
+  .hint-text .warn { color: var(--warn); }
+
+  /* 炮口分组卡片 */
+  .muz-group { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 6px 0; background: rgba(0,0,0,.15); }
+  .muz-group .muz-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .muz-group .muz-title { color: var(--muz); font-size: 11px; font-weight: 600; }
+  .muz-group .muz-del { background: rgba(255,90,77,.12); border: 1px solid rgba(255,90,77,.4); color: var(--fire);
+    border-radius: 3px; padding: 1px 6px; font-size: 9px; cursor: pointer; }
+  .muz-group .muz-del:hover { background: rgba(255,90,77,.3); }
+  .muz-group .ctrl { margin: 2px 0; }
+  .muz-group .ctrl label { width: 50px; font-size: 10px; }
+
+  /* 模式切换 */
+  .mode-switch { display: flex; gap: 4px; margin: 6px 0; padding: 4px; background: rgba(0,0,0,.25); border-radius: 6px; }
+  .mode-switch button { flex: 1; background: transparent; border: 1px solid transparent; color: var(--muted);
+    padding: 5px; font-size: 11px; cursor: pointer; border-radius: 4px; }
+  .mode-switch button.active { background: var(--accent); color: #05080a; font-weight: 600; }
+
+  /* ===== 底部状态条 ===== */
+  #status { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 11;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    padding: 4px 16px; color: var(--muted); font-size: 11px; max-width: 90vw; }
+  #status.ok { color: var(--prop); border-color: rgba(111,255,138,.3); }
+  #status.err { color: var(--fire); border-color: rgba(255,90,77,.3); }
+  #status .acc { color: var(--accent); }
+
+  /* ===== 底部提示 ===== */
+  #hint { position: fixed; bottom: 10px; left: 10px; z-index: 10; max-width: 300px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; font-size: 10px; color: var(--muted); line-height: 1.6; display: none; }
+  #hint b { color: var(--accent); }
+
+  /* ===== 导出弹窗 ===== */
+  #export-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 30;
+    background: var(--panel-solid); border: 1px solid var(--accent); border-radius: 10px; padding: 16px;
+    max-width: 720px; width: 92%; max-height: 88vh; display: none; flex-direction: column; }
+  #export-modal.show { display: flex; }
+  #export-modal h3 { color: var(--accent); margin-bottom: 4px; font-size: 14px; }
+  #export-modal .modal-sub { color: var(--muted); font-size: 11px; margin-bottom: 10px; }
+  #export-modal .export-tabs { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+  #export-modal .export-tabs button { background: rgba(111,208,255,.08); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--muted); padding: 4px 10px; font-size: 10px; cursor: pointer; }
+  #export-modal .export-tabs button.active { background: var(--accent); color: #05080a; }
+  #export-text { flex: 1; width: 100%; min-height: 320px; background: rgba(0,0,0,.55); color: var(--prop);
+    border: 1px solid var(--line); border-radius: 4px; padding: 10px; font-family: Consolas, monospace;
+    font-size: 11px; line-height: 1.5; resize: none; white-space: pre; overflow: auto; }
+  #export-modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+  #export-modal .modal-actions button { border-radius: 4px; padding: 6px 16px; cursor: pointer; font-size: 12px; border: 1px solid; }
+  #btn-copy-export { background: rgba(111,255,138,.15); border-color: var(--prop); color: var(--prop); }
+  #btn-close-export { background: rgba(255,90,77,.15); border-color: var(--fire); color: var(--fire); }
+
+  /* ===== 加载层 ===== */
+  #loader { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 40%, #122029, #05080a 70%); transition: opacity .4s; }
+  #loader.hide { opacity: 0; pointer-events: none; }
+  #loader .title { font-size: 20px; letter-spacing: 4px; color: var(--accent); margin-bottom: 18px; }
+  .bar { width: 300px; max-width: 70vw; height: 6px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #6fd0ff, #2a8fd0); transition: width .2s; }
+  #loader .pct { margin-top: 12px; font-size: 12px; color: var(--muted); }
+  #loader .err { margin-top: 16px; color: var(--fire); font-size: 12px; max-width: 80vw; text-align: center; }
+
+  /* 滚动条美化 */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: rgba(0,0,0,.2); }
+  ::-webkit-scrollbar-thumb { background: rgba(111,208,255,.3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(111,208,255,.5); }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<!-- ===== 顶栏 ===== -->
+<div id="topbar">
+  <label>模型</label>
+  <select id="model-sel"></select>
+  <button class="go" id="btn-load">加载</button>
+  <small>|</small>
+  <label>参考机</label>
+  <select id="ref-select">
+    <option value="">无</option>
+  </select>
+  <small>|</small>
+  <button id="btn-apply-refresh" title="重新加载模型并应用所有当前 Tab 参数（模拟游戏内渲染）">⟳ 应用并刷新</button>
+  <button class="prop" id="btn-open-game" title="新标签打开游戏 index.html 验证">▶ 打开游戏</button>
+  <small>|</small>
+  <button class="warn" id="btn-export">📋 导出配置</button>
+</div>
+
+<!-- ===== 左侧节点列表 ===== -->
+<div id="node-panel">
+  <div class="header"><span>节点列表</span><span class="count" id="node-count">0</span></div>
+  <div class="toolbar">
+    <button id="btn-sort-y">按Y</button>
+    <button id="btn-sort-name">按名</button>
+    <input id="node-filter" placeholder="过滤节点名…" />
+  </div>
+  <div id="node-list"></div>
+</div>
+
+<!-- ===== 右侧 Tab 面板 ===== -->
+<div id="panel">
+  <div class="tabs">
+    <button data-tab="base" class="active">① 基础坐标</button>
+    <button data-tab="muzzle">② 机枪炮口</button>
+    <button data-tab="gear">③ 起落架</button>
+    <button data-tab="prop">④ 螺旋桨</button>
+  </div>
+
+  <!-- ===== Tab 1: 基础坐标与比例 ===== -->
+  <div id="tab-base" class="tab-content active">
+    <h4>朝向校准 <span class="sub">机头对齐 -Z 绿线</span></h4>
+    <div class="check">
+      <input type="checkbox" id="auto-orient">
+      <label for="auto-orient">autoOrient（按螺旋桨质心自动偏航）</label>
+    </div>
+    <div class="ctrl"><label>偏航 Yaw°</label><input type="range" id="r-yaw" min="-180" max="360" step="0.5" value="0"><input type="number" id="r-yaw-v" class="val" min="-180" max="360" step="0.5" value="0"></div>
+    <div class="ctrl"><label>俯仰 Pitch°</label><input type="range" id="r-pitch" min="-45" max="45" step="0.5" value="0"><input type="number" id="r-pitch-v" class="val" min="-45" max="45" step="0.5" value="0"></div>
+    <div class="ctrl"><label>滚转 Roll°</label><input type="range" id="r-roll" min="-45" max="45" step="0.5" value="0"><input type="number" id="r-roll-v" class="val" min="-45" max="45" step="0.5" value="0"></div>
+    <div class="btn-row">
+      <button id="btn-auto-yaw">自动偏航</button>
+      <button id="btn-reset-orient">重置朝向</button>
+    </div>
+
+    <h4>缩放与中心 <span class="sub">userScale = 3.6×翼展/9.92</span></h4>
+    <div class="ctrl"><label>缩放 Scale</label><input type="range" id="r-scale" min="0.5" max="14" step="0.01" value="3.6"><input type="number" id="r-scale-v" class="val" min="0.5" max="14" step="0.01" value="3.6"></div>
+    <div class="hint-text" id="scale-hint">真实翼展: — m | 建议 userScale: —</div>
+    <div class="ctrl"><label>中心 X</label><input type="range" id="r-cx" min="-8" max="8" step="0.05" value="0"><input type="number" id="r-cx-v" class="val" min="-8" max="8" step="0.05" value="0"></div>
+    <div class="ctrl"><label>中心 Y</label><input type="range" id="r-cy" min="-8" max="8" step="0.05" value="0"><input type="number" id="r-cy-v" class="val" min="-8" max="8" step="0.05" value="0"></div>
+    <div class="ctrl"><label>中心 Z</label><input type="range" id="r-cz" min="-8" max="8" step="0.05" value="0"><input type="number" id="r-cz-v" class="val" min="-8" max="8" step="0.05" value="0"></div>
+    <div class="btn-row">
+      <button id="btn-reset-center">归零中心</button>
+      <button id="btn-show-bbox">显示包围盒</button>
+    </div>
+
+    <h4>模型尺寸信息</h4>
+    <div class="hint-text" id="bbox-info">加载模型后显示包围盒尺寸…</div>
+
+    <h4>场景显示</h4>
+    <div class="check"><input type="checkbox" id="show-world-axis" checked><label for="show-world-axis">显示世界坐标轴</label></div>
+    <div class="check"><input type="checkbox" id="show-labels" checked><label for="show-labels">显示方向标签</label></div>
+    <div class="btn-row">
+      <button id="btn-cam-chase" class="active">追尾</button>
+      <button id="btn-cam-side">侧面</button>
+      <button id="btn-cam-top">俯视</button>
+      <button id="btn-cam-front">正面</button>
+    </div>
+  </div>
+
+  <!-- ===== Tab 2: 机枪炮口 ===== -->
+  <div id="tab-muzzle" class="tab-content">
+    <h4>武器模式</h4>
+    <div class="mode-switch">
+      <button id="mode-fighter" class="active">战斗机（前方齐射）</button>
+      <button id="mode-bomber">轰炸机（多炮塔）</button>
+    </div>
+    <div class="hint-text" id="muzzle-mode-hint">
+      <b>战斗机模式</b>：所有枪口朝机头 -Z（与游戏敌机一致，aimLift=0 纯机头方向）。调整每挺枪口位置即可。<br>
+      切到轰炸机模式可调每个炮塔的独立朝向（Yaw/Pitch）。
+    </div>
+
+    <h4>枪口预设</h4>
+    <div class="ctrl">
+      <label>预设</label>
+      <select id="muz-preset">
+        <option value="custom">自定义</option>
+        <option value="spitfire">Spitfire 8×.303</option>
+        <option value="yak9">Yak-9 (4挺)</option>
+        <option value="he111">He 111 (1前+3炮塔)</option>
+        <option value="ju88">Ju 88 (1前+3炮塔)</option>
+      </select>
+    </div>
+
+    <h4>枪口列表 <span class="sub" id="muz-count">0 个</span></h4>
+    <div id="muz-list"></div>
+    <div class="btn-row">
+      <button class="muz" id="btn-add-muz">+ 新增炮口</button>
+      <button id="btn-markers" class="active">枪口标记</button>
+      <button id="btn-rays" class="active">弹道射线</button>
+    </div>
+
+    <div class="hint-text"><b>方向约定</b>：<span class="prop">机头=-Z</span>，右翼=+X，左翼=-X，上=+Y。敌机 aimLift 恒为 0，弹道=纯机头方向（与 aircraft.js getAimDirection 一致）。</div>
+  </div>
+
+  <!-- ===== Tab 3: 起落架 ===== -->
+  <div id="tab-gear" class="tab-content">
+    <h4>起落架节点标记</h4>
+    <div class="hint-text">
+      在左侧<b>节点列表</b>点击选中节点 → 点 <span class="gear">标记为起落架</span>。<br>
+      标记后的节点在游戏中会隐藏（hideGearNodes）。已标记节点红色高亮。
+    </div>
+    <div class="btn-row">
+      <button class="gear" id="btn-mark-gear">标记选中为起落架</button>
+      <button id="btn-clear-gear">清空标记</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-auto-detect-gear">关键词自动检测</button>
+      <button id="btn-hide-gear-preview" class="active">预览隐藏效果</button>
+    </div>
+
+    <h4>已标记起落架节点 <span class="sub" id="gear-count">0 个</span></h4>
+    <div class="hint-text" id="gear-list" style="max-height:200px;overflow:auto;font-family:Consolas,monospace;">无</div>
+
+    <h4>关键词匹配参考</h4>
+    <div class="hint-text">自动检测关键词：<b>gear / landing / 起落架 / wheel / 轮</b>（大小写不敏感）<br>
+      注：I-153/I-16 等历史机型用关键词匹配；Yak/喷火/He 111/Ju 88 用显式节点名精准匹配。</div>
+  </div>
+
+  <!-- ===== Tab 4: 螺旋桨 ===== -->
+  <div id="tab-prop" class="tab-content">
+    <h4>螺旋桨节点</h4>
+    <div class="hint-text">
+      在左侧节点列表选中桨叶节点 → 点 <span class="prop">标记为螺旋桨</span>。<br>
+      无标记时退化用关键词匹配（prop/螺旋桨/airscrew/vint/винт）。
+    </div>
+    <div class="btn-row">
+      <button class="prop" id="btn-mark-prop">标记选中为螺旋桨</button>
+      <button id="btn-clear-prop">清空标记</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-auto-detect-prop">关键词自动检测</button>
+      <button id="btn-rebuild-prop">重建桨毂</button>
+    </div>
+
+    <h4>旋转控制</h4>
+    <div class="ctrl"><label>转速 rad/s</label><input type="range" id="spin-speed" min="0" max="600" step="5" value="300"><span class="val" id="spin-speed-v">300</span></div>
+    <div class="ctrl"><label>旋转轴</label><select id="spin-axis"><option value="z" selected>Z (机头轴)</option><option value="y">Y</option><option value="x">X</option></select></div>
+    <div class="check"><input type="checkbox" id="auto-rotate" checked><label for="auto-rotate">每帧自动旋转</label></div>
+
+    <h4>桨毂圆心（Pivot 偏移）</h4>
+    <div class="ctrl"><label>X 偏移</label><input type="range" id="pivot-x" min="-5" max="5" step="0.001" value="0"><input type="number" id="pivot-x-v" class="val" step="0.001" value="0"></div>
+    <div class="ctrl"><label>Y 偏移</label><input type="range" id="pivot-y" min="-5" max="5" step="0.001" value="0"><input type="number" id="pivot-y-v" class="val" step="0.001" value="0"></div>
+    <div class="ctrl"><label>Z 偏移</label><input type="range" id="pivot-z" min="-5" max="5" step="0.001" value="0"><input type="number" id="pivot-z-v" class="val" step="0.001" value="0"></div>
+    <div class="btn-row">
+      <button id="btn-reset-pivot">归零偏移</button>
+    </div>
+
+    <h4>旋转轴倾斜</h4>
+    <div class="ctrl"><label>倾斜 X°</label><input type="range" id="tilt-x" min="-180" max="180" step="0.5" value="0"><input type="number" id="tilt-x-v" class="val" step="0.5" value="0"></div>
+    <div class="ctrl"><label>倾斜 Y°</label><input type="range" id="tilt-y" min="-180" max="180" step="0.5" value="0"><input type="number" id="tilt-y-v" class="val" step="0.5" value="0"></div>
+
+    <h4>桨叶材质与模糊盘</h4>
+    <div class="ctrl"><label>透明度</label><input type="range" id="opacity" min="0.05" max="1" step="0.01" value="0.22"><span class="val" id="opacity-v">0.22</span></div>
+    <div class="check"><input type="checkbox" id="blur-disc"><label for="blur-disc">propBlurDisc 动态模糊盘（黑桨身+黄桨尖）</label></div>
+    <div class="ctrl"><label>模糊强度</label><input type="range" id="blur-strength" min="0" max="1" step="0.05" value="0.35"><span class="val" id="blur-strength-v">0.35</span></div>
+
+    <h4>分组与模式</h4>
+    <div class="check"><input type="checkbox" id="multi-prop"><label for="multi-prop">multiProp 多桨独立旋转（双发机型）</label></div>
+    <div class="check"><input type="checkbox" id="blur-only"><label for="blur-only">propBlurOnly 纯模糊盘（左右桨合并，He 111）</label></div>
+    <div class="btn-row">
+      <button id="btn-single-group" class="prop active">单组（三叶合一）</button>
+      <button id="btn-multi-group">多组（各自旋转）</button>
+    </div>
+
+    <h4>机身显示</h4>
+    <div class="ctrl"><label>机身</label><select id="body-visibility"><option value="full" selected>完整</option><option value="hidden">隐藏（只看桨）</option><option value="ghost">半透明</option></select></div>
+
+    <h4>调试可视化</h4>
+    <div class="check"><input type="checkbox" id="show-pivot-marker" checked><label for="show-pivot-marker">桨毂标记（红球）</label></div>
+    <div class="check"><input type="checkbox" id="show-axis"><label for="show-axis">旋转轴指示线</label></div>
+    <div class="check"><input type="checkbox" id="wireframe"><label for="wireframe">线框模式</label></div>
+  </div>
+</div>
+
+<!-- ===== 状态条 ===== -->
+<div id="status">就绪 · 选择模型后点"加载"</div>
+
+<!-- ===== 导出弹窗 ===== -->
+<div id="export-modal">
+  <h3>导出配置</h3>
+  <div class="modal-sub">选择导出范围 → 复制 → 粘贴到 <b>js/enemy.js MODEL_CONFIGS</b> 注册表</div>
+  <div class="export-tabs">
+    <button data-export="all" class="active">全量配置</button>
+    <button data-export="base">① 基础坐标</button>
+    <button data-export="muzzle">② 机枪炮口</button>
+    <button data-export="gear">③ 起落架</button>
+    <button data-export="prop">④ 螺旋桨</button>
+  </div>
+  <textarea id="export-text" readonly></textarea>
+  <div class="modal-actions">
+    <button id="btn-copy-export">复制到剪贴板</button>
+    <button id="btn-close-export">关闭</button>
+  </div>
+</div>
+
+<!-- ===== 加载层 ===== -->
+<div id="loader">
+  <div class="title">模型预处理工具</div>
+  <div class="bar"><i id="loader-fill"></i></div>
+  <div class="pct" id="loader-pct">0%</div>
+  <div class="err" id="loader-err"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/node_modules/three/build/three.module.js",
+    "three/addons/": "/node_modules/three/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+// ====================================================================
+// 模型清单（所有可用飞机模型）
+// ====================================================================
+const MODEL_LIST = [
+  { url: '/model/spitfire.glb', name: 'Spitfire 喷火', role: 'fighter' },
+  { url: '/model/yak1.glb', name: 'Yak-1', role: 'fighter' },
+  { url: '/model/yak3.glb', name: 'Yak-3', role: 'fighter' },
+  { url: '/model/yak7.glb', name: 'Yak-7', role: 'fighter' },
+  { url: '/model/yak9.glb', name: 'Yak-9', role: 'fighter' },
+  { url: '/model/la5.glb', name: 'La-5FN', role: 'fighter' },
+  { url: '/model/i153.glb', name: 'I-153 海鸥', role: 'fighter' },
+  { url: '/model/i16.glb', name: 'I-16 小毛驴', role: 'fighter' },
+  { url: '/model/p51.glb', name: 'P-51 野马', role: 'fighter' },
+  { url: '/model/he111.glb', name: 'He 111 轰炸机', role: 'bomber' },
+  { url: '/model/ju88.glb', name: 'Ju 88 轰炸机', role: 'bomber' },
+  { url: '/model/ju87.glb', name: 'Ju 87 斯图卡', role: 'diveBomber' },
+  { url: '/model/il2.glb', name: 'IL-2 攻击机', role: 'attacker' },
+  { url: '/model/b17.glb', name: 'B-17 空中堡垒', role: 'bomber' },
+  { url: '/model/fw_190_a-4.glb', name: 'Fw 190 A-4', role: 'fighter' },
+  { url: '/model/fw_190_a-5.glb', name: 'Fw 190 A-5', role: 'fighter' },
+  // 注：玩家 Bf 109 E-4 不在本工具范围内（参数在 aircraft.js 构造函数硬编码，将来单独做工具）
+];
+
+// 真实翼展（米）—— 用于 userScale 计算：userScale = 3.6 × 翼展 / 9.92
+// 注：Bf 109（9.92m）为基准机型但不在本工具范围，保留 9.92 作为除数基准
+const REAL_WINGSPANS = {
+  '/model/spitfire.glb': 11.23, '/model/yak1.glb': 10.0,
+  '/model/yak3.glb': 9.2, '/model/yak7.glb': 10.0, '/model/yak9.glb': 9.7, '/model/la5.glb': 9.80,
+  '/model/i153.glb': 9.75, '/model/i16.glb': 9.0, '/model/p51.glb': 11.3,
+  '/model/he111.glb': 22.6, '/model/ju88.glb': 18.26, '/model/ju87.glb': 13.8,
+  '/model/il2.glb': 14.6, '/model/b17.glb': 31.6,
+  '/model/fw_190_a-4.glb': 10.50, '/model/fw_190_a-5.glb': 10.50,
+};
+
+// ====================================================================
+// MODEL_CONFIGS —— 与 enemy.js 同步（所有敌机 + 友军轰炸机外观参数）
+// 注：玩家 Bf 109 E-4 不在本工具范围（参数在 aircraft.js 构造函数硬编码，将来单独做工具）
+// ====================================================================
+const MODEL_CONFIGS = {
+  '/model/yak9.glb': {
+    autoOrient: false, yawOffset: -139, pitchOffset: 0, rollOffset: 0, userScale: 3.52,
+    muzzleOffsets: [
+      new THREE.Vector3( 6.50, -1.35, -4.15), new THREE.Vector3(-6.50, -1.35, -4.15),
+      new THREE.Vector3( 0.50,  1.00, -7.80), new THREE.Vector3(-0.50,  1.00, -7.80),
+    ],
+  },
+  '/model/i153.glb': { autoOrient: true, userScale: 3.54 },
+  '/model/i16.glb': { autoOrient: true, userScale: 3.27 },
+  '/model/yak1.glb': {
+    autoOrient: true, userScale: 3.63, hideGear: true,
+    hideGearNodes: ['Line27-FACES_1','Line26-FACES_1','Line25-FACES_1','Torus08-FACES_1',
+      'Cylinder28-FACES_1','Line08-FACES_1','Line09-FACES_1','Line03-FACES_1',
+      'Torus06-FACES_1','stv_gl1-FACES_1','stv_gl2-FACES_1','Line20-FACES_1',
+      'Line04-FACES_1','Line19-FACES_1','Line02-FACES_1','stv_gl04-FACES_1',
+      'Line24-FACES_1','Line23-FACES_1','Line22-FACES_1','Line21-FACES_1',
+      'stv_gl03-FACES_1','Cylinder26-FACES_1'],
+    propNodes: ['Line16-FACES_1','Line17-FACES_1','Line05-FACES_1'],
+  },
+  '/model/yak7.glb': { autoOrient: true, userScale: 3.63 },
+  '/model/yak3.glb': {
+    autoOrient: true, userScale: 3.34, hideGear: true,
+    hideGearNodes: ['Object06-FACES_1','Object05-FACES_1','stvgl01-FACES_1','stvgl-FACES_1',
+      'Object04-FACES_1','Object03-FACES_1','Line45-FACES_1','Line44-FACES_1',
+      'Line43-FACES_1','Cylinder32-FACES_1','Line42-FACES_1','Line41-FACES_1',
+      'Line40-FACES_1','Torus09-FACES_1','Line26-FACES_1','Line21-FACES_1',
+      'Line27-FACES_1','Torus08-FACES_1','Cylinder28-FACES_1','Line24-FACES_1',
+      'Line22-FACES_1','Line25-FACES_1'],
+    propNodes: ['Line30-FACES_1','Line29-FACES_1','Line05-FACES_1'],
+  },
+  '/model/la5.glb': {
+    autoOrient: false, yawOffset: 236.5, pitchOffset: 0.0, rollOffset: 0.0, userScale: 3.60,
+    centerOffset: [1.95, 0.00, 0.00],
+    muzzleOffsets: [
+      new THREE.Vector3( 0.60, 1.85, -7.55), new THREE.Vector3(-1.05, 1.85, -7.55),
+    ],
+    hideGear: true,
+    hideGearNodes: ['Torus03-FACES_1','Cylinder20-FACES_1','Cylinder02_0-FACES_1','Cylinder21-FACES_1',
+      'Cylinder84-FACES_1','Cylinder16-FACES_1','Box03-FACES_1','Box04-FACES_1',
+      'Cylinder103-FACES_1','Cylinder101-FACES_1','Cylinder100-FACES_1','Torus02-FACES_1',
+      'Cylinder99-FACES_1','Cylinder98-FACES_1','Cylinder97-FACES_1','Object03-FACES_1',
+      'Box06-FACES_1','Box05-FACES_1','Cylinder109-FACES_1','Cylinder108-FACES_1',
+      'Cylinder107-FACES_1','Cylinder106','Object_87','Cylinder106-FACES','Cylinder106-FACES_1',
+      'Cylinder105-FACES_1','Cylinder104-FACES_1','Torus04-FACES_1',
+      'Object06-FACES_1','Object02-FACES_1','Object05-FACES_1',
+      'lForeArm_0-FACES_1','figureHair-FACES_1','lHand_01-FACES_1','neck_01-FACES_1'],
+    propNodes: ['Cylinder77-FACES_1','Cylinder93-FACES_1','Cylinder94-FACES_1'],
+    propSpinSpeed: 300, propOpacity: 0.22, propBlurDisc: true, propBlurStrength: 0.35,
+    propPivotOffset: { x: 0.009, y: 1.019, z: 0.139 },
+  },
+  '/model/spitfire.glb': {
+    autoOrient: false, yawOffset: -124.091, userScale: 4.08, hideGear: true,
+    hideGearNodes: ['Object03-FACES_1','Cylinder07-FACES_1','Cylinder01-FACES_1','Cylinder06-FACES_1',
+      'Torus01-FACES_1','Cylinder05-FACES_1','Cylinder82-FACES_1','Cylinder83-FACES_1',
+      'Torus04-FACES_1','Cylinder84-FACES_1','Cylinder81-FACES_1','Object02-FACES_1',
+      'Cylinder80-FACES_1','Cylinder20-FACES_1','Cylinder02-FACES_1','Torus03-FACES_1','Cylinder16-FACES_1'],
+    propNodes: ['Cylinder78-FACES_1','Cylinder79-FACES_1','Cylinder77-FACES_1'],
+    propSpinSpeed: 95, propOpacity: 0.14, propBlurDisc: true, propBlurStrength: 0.35,
+    propAxisTilt: { x: 0, y: 0 }, propPivotOffset: { x: 0, y: 0, z: 0 },
+    muzzleOffsets: [
+      new THREE.Vector3( 12.05, -0.30, -6.80), new THREE.Vector3(  9.20, -0.60, -7.00),
+      new THREE.Vector3(  8.40, -0.70, -7.05), new THREE.Vector3(  6.50, -0.90, -7.05),
+      new THREE.Vector3(-6.35, -0.95, -6.85), new THREE.Vector3(-8.30, -0.75, -6.70),
+      new THREE.Vector3(-9.05, -0.70, -6.65), new THREE.Vector3(-11.85, -0.30, -6.30),
+    ],
+  },
+  '/model/he111.glb': {
+    autoOrient: false, yawOffset: -51.0, pitchOffset: 0.0, rollOffset: 0.0, userScale: 8.20,
+    centerOffset: [2.55, 0.00, 0.50],
+    propNodes: ['Ellipse09-FACES'], propBlurOnly: true, hideGear: true,
+    hideGearNodes: ['Cylinder03-FACES','Torus03-FACES','Cylinder15-FACES','stv01-FACES','stv03-FACES','Cylinder11-FACES'],
+    muzzleOffsets: [
+      new THREE.Vector3(-0.15, -2.15, -19.10), new THREE.Vector3(-0.40,  5.10,  4.80),
+      new THREE.Vector3( 0.25, -4.45, 12.35), new THREE.Vector3( 3.70,  0.95,  8.70),
+    ],
+    muzzleDirs: [
+      new THREE.Vector3( 0.017, -0.292, -0.956), new THREE.Vector3( 0.000,  0.500,  0.866),
+      new THREE.Vector3( 0.000, -0.500,  0.866), new THREE.Vector3( 0.839,  0.000,  0.545),
+    ],
+  },
+  '/model/ju88.glb': {
+    autoOrient: false, yawOffset: 308.5, pitchOffset: 0.0, rollOffset: 0.0, userScale: 6.64,
+    centerOffset: [1.40, 0.00, 0.00], hideGear: true,
+    hideGearNodes: ['Cylinder02-FACES_1','Cylinder01-FACES_1','Cylinder03-FACES_1','Cylinder04-FACES_1',
+      'Cylinder05-FACES_1','Cylinder06-FACES_1','Cylinder07-FACES_1','Cylinder09-FACES_1','Cylinder10-FACES_1',
+      'Cylinder11-FACES_1','Cylinder22-FACES_1','Cylinder23-FACES_1','Cylinder24-FACES_1','Cylinder25-FACES_1',
+      'Cylinder26-FACES_1','Cylinder27-FACES_1','Cylinder28-FACES_1',
+      'Torus01-FACES_1','Torus02-FACES_1','Torus03-FACES_1','Torus04-FACES_1','Torus05-FACES_1',
+      'Line16-FACES_1','stvorka_04-FACES_1','stvorka_03-FACES_1','stvorka_02-FACES_1','stvorka_1-FACES_1',
+      'Object01-FACES_1','Object02-FACES_1','Object07-FACES_1','Object08-FACES_1','Object09-FACES_1',
+      'Object10-FACES_1','Object19-FACES_1','Object20-FACES_1','Box01-FACES_1','Box04-FACES_1'],
+    muzzleOffsets: [
+      new THREE.Vector3( 0.25, 3.15, -13.65), new THREE.Vector3(-1.25, 4.25, -4.00),
+      new THREE.Vector3( 0.55,-3.05, -3.70), new THREE.Vector3( 0.90, 4.15, -3.65),
+    ],
+    muzzleDirs: [
+      new THREE.Vector3( 0.000,  0.000, -1.000), new THREE.Vector3(-0.325,  0.309,  0.894),
+      new THREE.Vector3( 0.000, -0.423,  0.906), new THREE.Vector3( 0.278,  0.309,  0.909),
+    ],
+  },
+  // Fw 190 A-4（1942 德国战斗机，库尔斯克德方主力之一）
+  // autoOrient=false：Object_2 在机尾方向，autoOrient 把它当机头会算反方向。
+  // 模型原始机头在 +Z，yawOffset=180 翻转使机头对齐 body frame -Z。
+  // 整个飞机是 Object_7（机身），桨叶几何与机身合并，无独立桨叶节点。
+  // Object_2 是机尾小部件，Object_3/4/5 是起落架，Object_9 是座舱玻璃（不透明）。
+  '/model/fw_190_a-4.glb': {
+    autoOrient: false, yawOffset: 180.0,
+    pitchOffset: 0.0, rollOffset: 0.0, userScale: 3.81,
+    centerOffset: [0.00, 0.00, -3.05],
+    propNodes: [],
+    hideGear: true,
+    hideGearNodes: ['Object_4', 'Object_3', 'Object_5'],
+  },
+  '/model/il2.glb': {
+    autoOrient: false, yawOffset: 242.0, pitchOffset: 0.0, rollOffset: 0.0, userScale: 3.60,
+    centerOffset: [2.15, 0.00, 0.00],
+    muzzleOffsets: [
+      new THREE.Vector3( 5.90, -0.80, -4.60), new THREE.Vector3(-6.00, -0.80, -4.60),
+      new THREE.Vector3(-0.10,  1.45,  4.65), new THREE.Vector3(-0.10,  1.45,  4.65),
+      new THREE.Vector3(-0.10,  1.45,  4.65), new THREE.Vector3(-0.10,  1.45,  4.65),
+      new THREE.Vector3(-0.10,  1.45,  4.65),
+    ],
+    muzzleDirs: [
+      new THREE.Vector3( 0.0,  0.0, -1.0), new THREE.Vector3( 0.0,  0.0, -1.0),
+      new THREE.Vector3( 0.483, 0.259, 0.836), new THREE.Vector3(-0.483, 0.259, 0.836),
+      new THREE.Vector3( 0.000, 0.574, 0.819), new THREE.Vector3( 0.640, 0.087, 0.763),
+      new THREE.Vector3(-0.640, 0.087, 0.763),
+    ],
+  },
+};
+
+// ====================================================================
+// 枪口预设（位置 + 方向 yaw/pitch，body frame）
+// yaw=0,pitch=0 → 朝机头 -Z；yaw=180 → 朝机尾；pitch=90 → 朝上
+// ====================================================================
+const MUZZLE_PRESETS = {
+  spitfire: [
+    { name: '右翼外', x: 12.05, y: -0.30, z: -6.80, yaw: 0, pitch: 0 },
+    { name: '右翼中外', x: 9.20, y: -0.60, z: -7.00, yaw: 0, pitch: 0 },
+    { name: '右翼中内', x: 8.40, y: -0.70, z: -7.05, yaw: 0, pitch: 0 },
+    { name: '右翼内', x: 6.50, y: -0.90, z: -7.05, yaw: 0, pitch: 0 },
+    { name: '左翼内', x: -6.35, y: -0.95, z: -6.85, yaw: 0, pitch: 0 },
+    { name: '左翼中内', x: -8.30, y: -0.75, z: -6.70, yaw: 0, pitch: 0 },
+    { name: '左翼中外', x: -9.05, y: -0.70, z: -6.65, yaw: 0, pitch: 0 },
+    { name: '左翼外', x: -11.85, y: -0.30, z: -6.30, yaw: 0, pitch: 0 },
+  ],
+  yak9: [
+    { name: '右机翼', x: 6.50, y: -1.35, z: -4.15, yaw: 0, pitch: 0 },
+    { name: '左机翼', x: -6.50, y: -1.35, z: -4.15, yaw: 0, pitch: 0 },
+    { name: '右机头', x: 0.50, y: 1.00, z: -7.80, yaw: 0, pitch: 0 },
+    { name: '左机头', x: -0.50, y: 1.00, z: -7.80, yaw: 0, pitch: 0 },
+  ],
+  il2: [
+    { name: '右机翼20mm', x: 5.90, y: -0.80, z: -4.60, yaw: 0, pitch: 0 },
+    { name: '左机翼20mm', x: -6.00, y: -0.80, z: -4.60, yaw: 0, pitch: 0 },
+    { name: '后座斜后左上', x: -0.10, y: 1.45, z: 4.65, yaw: 150, pitch: 15 },
+    { name: '后座斜后右上', x: -0.10, y: 1.45, z: 4.65, yaw: 210, pitch: 15 },
+    { name: '后座正后高上', x: -0.10, y: 1.45, z: 4.65, yaw: 180, pitch: 35 },
+    { name: '后座斜后左平', x: -0.10, y: 1.45, z: 4.65, yaw: 140, pitch: 5 },
+    { name: '后座斜后右平', x: -0.10, y: 1.45, z: 4.65, yaw: 220, pitch: 5 },
+  ],
+  he111: [
+    { name: '前枪(机头)', x: -0.15, y: -2.15, z: -19.10, yaw: 1, pitch: -17 },
+    { name: '背炮塔(后上)', x: -0.40, y: 5.10, z: 4.80, yaw: 180, pitch: 30 },
+    { name: '腹炮塔(后下)', x: 0.25, y: -4.45, z: 12.35, yaw: 180, pitch: -30 },
+    { name: '侧后枪(右后)', x: 3.70, y: 0.95, z: 8.70, yaw: 123, pitch: 0 },
+  ],
+  ju88: [
+    { name: '前枪(座舱)', x: 0.25, y: 3.15, z: -13.65, yaw: 0, pitch: 0 },
+    { name: '背炮塔(后上)', x: -1.25, y: 4.25, z: -4.00, yaw: -160, pitch: 18 },
+    { name: '腹炮塔(后下)', x: 0.55, y: -3.05, z: -3.70, yaw: 180, pitch: -25 },
+    { name: '侧后枪(右后)', x: 0.90, y: 4.15, z: -3.65, yaw: 163, pitch: 18 },
+  ],
+};
+
+// 螺旋桨/起落架关键词（与 aircraft.js 同步）
+const PROP_KEYWORDS = ['prop', '螺旋桨', 'airscrew', 'propeller', 'vint', 'винт'];
+const GEAR_KEYWORDS = ['gear', 'landing', '起落架', 'wheel', '轮'];
+function isPropName(name) { if (!name) return false; const n = String(name).toLowerCase(); return PROP_KEYWORDS.some(k => n.includes(k)); }
+function isGearName(name) { if (!name) return false; const n = String(name).toLowerCase(); return GEAR_KEYWORDS.some(k => n.includes(k)); }
+
+// ====================================================================
+// 全局状态
+// ====================================================================
+let scene, camera, renderer, controls, clock;
+let modelRoot = null;       // modelRot Group（应用 yaw/pitch/roll 校准）
+let model = null;           // gltf.scene（归一化 + userScale + centerOffset）
+let baseScale = 1;          // 归一化缩放（最长边→9）
+const modelCenter = new THREE.Vector3(); // 原始 Box3 中心
+let currentUrl = null;
+
+// 参考飞机
+let refGroup = null;
+
+// 节点列表
+const state = {
+  nodes: [], selectedName: null, sortOrder: 'y', filter: '',
+  markedPropNames: [], markedGearNames: [],
+};
+
+// 基础变换参数
+const base = { autoOrient: true, yaw: 0, pitch: 0, roll: 0, scale: 3.6, cx: 0, cy: 0, cz: 0 };
+
+// 炮口
+let muzzleMode = 'fighter'; // 'fighter' | 'bomber'
+let muzzles = [];            // [{ name, x, y, z, yaw, pitch }]
+const muzzleMarkers = [];
+const rayLines = [];
+const RAY_LEN = 400;
+
+// 螺旋桨
+let blades = [];
+let multiPivots = [], propTilts = [], propRigs = [];
+let bladeCentersModel = [], baseCentersModel = [];
+let blurDiscs = [];
+let pivotMarkers = [], axisHelper = null;
+let propBboxModel = null, bladeRadius = 1;
+const propState = {
+  spinSpeed: 95, spinAxis: 'z', autoRotate: true,
+  pivotOffset: { x: 0, y: 0, z: 0 }, axisTilt: { x: 0, y: 0 },
+  opacity: 0.22, blurDisc: false, blurStrength: 0.35,
+  multiProp: false, blurOnly: false, singleGroup: true,
+  showPivotMarker: true, showAxis: false, wireframe: false,
+  bodyVisibility: 'full',
+};
+
+// 场景显示
+let worldAxisHelper = null, labelSprites = [];
+let bboxHelper = null;
+
+// 相机
+let camMode = 'chase';
+const camOffsets = {
+  chase: new THREE.Vector3(0, 4, 16), side: new THREE.Vector3(22, 4, 0),
+  top: new THREE.Vector3(0, 28, 0.5), front: new THREE.Vector3(0, 2, -22),
+};
+
+// ====================================================================
+// 初始化场景
+// ====================================================================
+function init() {
+  const canvas = document.getElementById('scene');
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 50000);
+  camera.position.set(14, 6, 20);
+
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+
+  // 天空（渐变球）
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(20000, 32, 16),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide, toneMapped: false, depthWrite: false,
+      uniforms: {
+        topColor: { value: new THREE.Color(0x2a6fb6) },
+        midColor: { value: new THREE.Color(0x8fb8d8) },
+        botColor: { value: new THREE.Color(0x4a5530) },
+      },
+      vertexShader: `varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+      fragmentShader: `varying vec3 vP; uniform vec3 topColor; uniform vec3 midColor; uniform vec3 botColor;
+        void main(){ float h=normalize(vP).y; vec3 c=h>0.0?mix(midColor,topColor,smoothstep(0.0,0.55,h)):mix(midColor,botColor,smoothstep(0.0,-0.25,h)); gl_FragColor=vec4(c,1.0);}`,
+    })
+  );
+  scene.add(sky);
+  scene.sky = sky;
+
+  // 光照
+  scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x4a5d3a, 1.0));
+  const sun = new THREE.DirectionalLight(0xfff1d0, 2.4);
+  sun.position.set(40, 60, 30); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -40; sun.shadow.camera.right = 40;
+  sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40;
+  sun.shadow.camera.far = 200; sun.shadow.bias = -0.0004;
+  scene.add(sun); scene.add(sun.target);
+
+  scene.fog = new THREE.FogExp2(0x8fb8d8, 0.0008);
+
+  // 地面网格（标识 天/地 分界）
+  const grid = new THREE.GridHelper(200, 100, 0x6fd0ff, 0x2a4a55);
+  grid.material.opacity = 0.25; grid.material.transparent = true; grid.position.y = -6;
+  scene.add(grid);
+  // 地平面（淡色，强化"地面"方向感）
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(100, 64),
+    new THREE.MeshBasicMaterial({ color: 0x3a4528, transparent: true, opacity: 0.35, depthWrite: false })
+  );
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -6; scene.add(ground);
+
+  // 世界坐标轴
+  worldAxisHelper = new THREE.AxesHelper(8);
+  scene.add(worldAxisHelper);
+
+  // OrbitControls
+  controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.target.set(0, 0, 0);
+  controls.minDistance = 3; controls.maxDistance = 200;
+
+  clock = new THREE.Clock();
+
+  // 方向标签
+  createDirectionLabels();
+
+  addEventListener('resize', onResize);
+}
+
+function onResize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+
+// 方向标签（Canvas Sprite，始终面向相机）
+function makeLabelSprite(text, color = '#6fff8a') {
+  const cv = document.createElement('canvas');
+  cv.width = 320; cv.height = 80;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.strokeRect(2, 2, cv.width - 4, cv.height - 4);
+  ctx.fillStyle = color; ctx.font = 'bold 40px Consolas, "Microsoft YaHei", monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, cv.width / 2, cv.height / 2);
+  const tex = new THREE.CanvasTexture(cv); tex.needsUpdate = true;
+  const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
+  const sp = new THREE.Sprite(mat);
+  sp.scale.set(10, 2.5, 1); sp.renderOrder = 20;
+  return sp;
+}
+function createDirectionLabels() {
+  const R = 32;
+  const labels = [
+    { text: '机头 -Z', pos: [0, 0, -R], color: '#6fff8a' },
+    { text: '机尾 +Z', pos: [0, 0, R], color: '#ff5a4d' },
+    { text: '右翼 +X', pos: [R, 0, 0], color: '#ffd84d' },
+    { text: '左翼 -X', pos: [-R, 0, 0], color: '#ffd84d' },
+    { text: '天空 +Y', pos: [0, R, 0], color: '#6fd0ff' },
+    { text: '地面 -Y', pos: [0, -R, 0], color: '#8a8070' },
+  ];
+  labels.forEach(l => {
+    const sp = makeLabelSprite(l.text, l.color);
+    sp.position.set(l.pos[0], l.pos[1], l.pos[2]);
+    sp.userData.isLabel = true;
+    scene.add(sp); labelSprites.push(sp);
+  });
+}
+
+// ====================================================================
+// 模型加载
+// ====================================================================
+const loader = new GLTFLoader();
+const draco = new DRACOLoader();
+draco.setDecoderPath('/node_modules/three/examples/jsm/libs/draco/');
+loader.setDRACOLoader(draco);
+loader.setMeshoptDecoder(MeshoptDecoder);
+
+async function loadModel(url, applyConfig = true) {
+  const loaderEl = document.getElementById('loader');
+  loaderEl.classList.remove('hide');
+  document.getElementById('loader-fill').style.width = '0%';
+  document.getElementById('loader-pct').textContent = '0%';
+  document.getElementById('loader-err').textContent = '';
+  setStatus('加载中: ' + url.split('/').pop(), '');
+
+  // 清理旧模型
+  if (modelRoot) { scene.remove(modelRoot); modelRoot = null; model = null; }
+  clearPropSetup();
+  clearMuzzleObjects();
+  state.nodes = []; state.selectedName = null; state.markedPropNames = []; state.markedGearNames = [];
+
+  currentUrl = url;
+
+  try {
+    const gltf = await loader.loadAsync(url, (e) => {
+      if (e.lengthComputable) {
+        const p = (e.loaded / e.total) * 100;
+        document.getElementById('loader-fill').style.width = p + '%';
+        document.getElementById('loader-pct').textContent = p.toFixed(0) + '%';
+      }
+    });
+    model = gltf.scene;
+    model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+
+    // 归一化 + 居中（与 aircraft.js _normalize 一致）
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    modelCenter.copy(center);
+    const longest = Math.max(size.x, size.y, size.z) || 1;
+    baseScale = 9 / longest;
+
+    modelRoot = new THREE.Group(); // modelRot：应用 yaw/pitch/roll
+    modelRoot.add(model);
+    scene.add(modelRoot);
+
+    // 应用配置（预填各 Tab 参数）
+    if (applyConfig) applyModelConfig(url);
+
+    // 收集节点
+    collectNodes(url);
+
+    // 应用基础变换（含 autoOrient）
+    applyBaseTransform();
+    // 应用起落架隐藏
+    applyGearHide();
+    // 应用螺旋桨
+    setupProp();
+    // 应用炮口
+    applyMuzzlePreset(pickPresetByUrl(url));
+
+    // 更新各面板信息
+    updateBboxInfo();
+    updateGearList();
+    updateScaleHint();
+    updateMuzzleModeHint();
+
+    setStatus('就绪 · ' + url.split('/').pop() + ' · 机头对齐绿线 -Z', 'ok');
+    setTimeout(() => loaderEl.classList.add('hide'), 250);
+  } catch (err) {
+    document.getElementById('loader-err').textContent = '加载失败：' + (err.message || err) + '\n请通过本地 HTTP 服务器打开。';
+    setStatus('加载失败: ' + (err.message || err), 'err');
+  }
+}
+
+// 应用 MODEL_CONFIGS 配置到各 Tab 参数（预填）
+function applyModelConfig(url) {
+  const cfg = MODEL_CONFIGS[url] || {};
+  // 基础
+  base.autoOrient = cfg.autoOrient !== undefined ? cfg.autoOrient : true;
+  base.yaw = cfg.yawOffset || 0;
+  base.pitch = cfg.pitchOffset || 0;
+  base.roll = cfg.rollOffset || 0;
+  base.scale = cfg.userScale || 3.6;
+  base.cx = cfg.centerOffset ? (cfg.centerOffset[0] || 0) : 0;
+  base.cy = cfg.centerOffset ? (cfg.centerOffset[1] || 0) : 0;
+  base.cz = cfg.centerOffset ? (cfg.centerOffset[2] || 0) : 0;
+  // 【关键】autoOrient=true 时，按螺旋桨质心自动计算偏航（与游戏中 _autoOrient 完全一致）
+  if (base.autoOrient && model) {
+    base.yaw = computeAutoOrient(model, cfg);
+  }
+  // 螺旋桨：默认转速 PROP_SPIN=300（与 aircraft.js 一致），机型可通过 cfg 覆盖（喷火 95）
+  propState.spinSpeed = cfg.propSpinSpeed !== undefined ? cfg.propSpinSpeed : 300;
+  propState.opacity = cfg.propOpacity !== undefined ? cfg.propOpacity : 0.22;
+  propState.blurDisc = !!cfg.propBlurDisc;
+  propState.blurStrength = cfg.propBlurStrength !== undefined ? cfg.propBlurStrength : 0.35;
+  propState.multiProp = !!cfg.multiProp;
+  propState.blurOnly = !!cfg.propBlurOnly;
+  if (cfg.propAxisTilt) propState.axisTilt = { x: cfg.propAxisTilt.x || 0, y: cfg.propAxisTilt.y || 0 };
+  if (cfg.propPivotOffset) propState.pivotOffset = { x: cfg.propPivotOffset.x||0, y: cfg.propPivotOffset.y||0, z: cfg.propPivotOffset.z||0 };
+  // 节点标记（预填）
+  if (cfg.propNodes) state.markedPropNames = cfg.propNodes.slice();
+  if (cfg.hideGearNodes) state.markedGearNames = cfg.hideGearNodes.slice();
+  // 同步 UI
+  syncBaseUI(); syncPropUI(); syncMuzzleUI();
+}
+
+// 收集所有 mesh 节点
+function collectNodes(url) {
+  const cfg = MODEL_CONFIGS[url] || {};
+  const meshNodes = [];
+  model.traverse(o => {
+    if (o.isMesh && o.name) {
+      const mbox = new THREE.Box3().setFromObject(o);
+      const msize = mbox.getSize(new THREE.Vector3());
+      const mcenter = mbox.getCenter(new THREE.Vector3());
+      if (!isFinite(mcenter.y) || msize.length() < 0.001) return;
+      // 备份原始材质属性
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach(m => { if (m && m._origEmissive === undefined) { m._origEmissive = m.emissive ? m.emissive.clone() : null; m._origEmissiveI = m.emissiveIntensity; m._origOpacity = m.opacity; m._origTransparent = m.transparent; } });
+      meshNodes.push({
+        name: o.name, mesh: o, y: mcenter.y, x: mcenter.x, z: mcenter.z,
+        size: msize, visible: o.visible,
+        markedProp: cfg.propNodes ? cfg.propNodes.includes(o.name) : false,
+        markedGear: cfg.hideGearNodes ? cfg.hideGearNodes.includes(o.name) : false,
+        isPropName: isPropName(o.name), isGearName: isGearName(o.name),
+      });
+    }
+  });
+  state.nodes = meshNodes;
+  renderNodeList();
+  document.getElementById('node-count').textContent = meshNodes.length + ' 节点';
+}
+
+// ====================================================================
+// Tab 1: 基础坐标与比例
+// ====================================================================
+function computeAutoOrient(m, cfg) {
+  if (!cfg || cfg.autoOrient === false) return cfg ? cfg.yawOffset || 0 : 0;
+  m.updateWorldMatrix(true, true);
+  const propNodes = [];
+  const explicit = (state.markedPropNames && state.markedPropNames.length) ? state.markedPropNames : (cfg.propNodes || null);
+  if (explicit && explicit.length) {
+    const set = new Set(explicit);
+    m.traverse(o => { if (o.name && set.has(o.name)) propNodes.push(o); });
+  } else {
+    m.traverse(o => { if (isPropName(o.name)) propNodes.push(o); });
+  }
+  if (!propNodes.length) return cfg.yawOffset || 0;
+  const c = new THREE.Vector3();
+  const tmpBox = new THREE.Box3(); const tmpCenter = new THREE.Vector3();
+  propNodes.forEach(o => { tmpBox.setFromObject(o); tmpBox.getCenter(tmpCenter); c.add(tmpCenter); });
+  c.divideScalar(propNodes.length);
+  const nx = c.x, nz = c.z;
+  if (Math.hypot(nx, nz) < 1e-3) return cfg.yawOffset || 0;
+  const phi = Math.atan2(nx, nz);
+  return THREE.MathUtils.radToDeg(Math.PI - phi);
+}
+
+function applyBaseTransform() {
+  if (!modelRoot || !model) return;
+  modelRoot.rotation.set(
+    THREE.MathUtils.degToRad(base.pitch),
+    THREE.MathUtils.degToRad(base.yaw),
+    THREE.MathUtils.degToRad(base.roll),
+    'YXZ'
+  );
+  const s = baseScale * base.scale;
+  model.scale.setScalar(s);
+  model.position.copy(modelCenter).multiplyScalar(-s).add(
+    new THREE.Vector3(base.cx, base.cy, base.cz)
+  );
+  // 基础变换变化后，螺旋桨桨叶世界位置变化，需重建 pivot
+  if (blades.length) rebuildPivot();
+  updateBboxInfo();
+}
+
+function updateBboxInfo() {
+  if (!model) { document.getElementById('bbox-info').textContent = '未加载模型'; return; }
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const realWingspan = REAL_WINGSPANS[currentUrl] || 9.92;
+  const unitsPerMeter = (baseScale * base.scale) / realWingspan * 9.92; // 单位/米
+  document.getElementById('bbox-info').innerHTML =
+    `归一化后尺寸: <b>${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)}</b> 单位<br>` +
+    `baseScale=${baseScale.toFixed(3)} · userScale=${base.scale.toFixed(2)} · 总缩放=${(baseScale*base.scale).toFixed(2)}<br>` +
+    `真实翼展≈${realWingspan}m · 比例≈${unitsPerMeter.toFixed(2)} 单位/米<br>` +
+    `<span style="color:var(--muted)">X=翼展方向 Y=高度 Z=机身方向（校准后机头在 -Z）</span>`;
+}
+
+function updateScaleHint() {
+  const realWingspan = REAL_WINGSPANS[currentUrl] || 9.92;
+  const suggest = (3.6 * realWingspan / 9.92).toFixed(2);
+  document.getElementById('scale-hint').innerHTML =
+    `真实翼展: <b>${realWingspan} m</b> | 建议 userScale: <b>${suggest}</b>（= 3.6 × ${realWingspan} / 9.92）`;
+}
+
+function syncBaseUI() {
+  document.getElementById('auto-orient').checked = base.autoOrient;
+  ['yaw','pitch','roll'].forEach(k => {
+    document.getElementById('r-' + k).value = base[k];
+    document.getElementById('r-' + k + '-v').value = base[k].toFixed(1);
+  });
+  document.getElementById('r-scale').value = base.scale;
+  document.getElementById('r-scale-v').value = base.scale.toFixed(2);
+  ['cx','cy','cz'].forEach(k => {
+    document.getElementById('r-' + k).value = base[k];
+    document.getElementById('r-' + k + '-v').value = base[k].toFixed(2);
+  });
+}
+
+function bindBaseTab() {
+  document.getElementById('auto-orient').onchange = e => { base.autoOrient = e.target.checked; };
+  const bind = (id, vid, key, fmt) => {
+    const r = document.getElementById(id), n = document.getElementById(vid);
+    const apply = (v) => { v = +v; if (Number.isNaN(v)) return; base[key] = v; r.value = v; n.value = fmt(v); applyBaseTransform(); };
+    r.oninput = () => apply(r.value); n.oninput = () => apply(n.value);
+  };
+  bind('r-yaw', 'r-yaw-v', 'yaw', v => v.toFixed(1));
+  bind('r-pitch', 'r-pitch-v', 'pitch', v => v.toFixed(1));
+  bind('r-roll', 'r-roll-v', 'roll', v => v.toFixed(1));
+  bind('r-scale', 'r-scale-v', 'scale', v => v.toFixed(2));
+  bind('r-cx', 'r-cx-v', 'cx', v => v.toFixed(2));
+  bind('r-cy', 'r-cy-v', 'cy', v => v.toFixed(2));
+  bind('r-cz', 'r-cz-v', 'cz', v => v.toFixed(2));
+
+  document.getElementById('btn-auto-yaw').onclick = () => {
+    if (!model) return;
+    const cfg = MODEL_CONFIGS[currentUrl] || {};
+    base.yaw = computeAutoOrient(model, cfg);
+    base.pitch = 0; base.roll = 0;
+    syncBaseUI(); applyBaseTransform();
+    setStatus('已按螺旋桨质心自动计算偏航', 'ok');
+  };
+  document.getElementById('btn-reset-orient').onclick = () => {
+    base.yaw = 0; base.pitch = 0; base.roll = 0;
+    syncBaseUI(); applyBaseTransform();
+  };
+  document.getElementById('btn-reset-center').onclick = () => {
+    base.cx = 0; base.cy = 0; base.cz = 0;
+    syncBaseUI(); applyBaseTransform();
+  };
+  document.getElementById('btn-show-bbox').onclick = () => {
+    if (bboxHelper) { scene.remove(bboxHelper); bboxHelper.dispose && bboxHelper.dispose(); bboxHelper = null; setStatus('已隐藏包围盒'); return; }
+    if (!model) return;
+    const box = new THREE.Box3().setFromObject(model);
+    bboxHelper = new THREE.Box3Helper(box, 0x6fd0ff);
+    scene.add(bboxHelper);
+    setStatus('显示模型包围盒', 'ok');
+  };
+  document.getElementById('show-world-axis').onchange = e => { if (worldAxisHelper) worldAxisHelper.visible = e.target.checked; };
+  document.getElementById('show-labels').onchange = e => { labelSprites.forEach(s => s.visible = e.target.checked); };
+}
+
+// ====================================================================
+// Tab 2: 机枪炮口
+// ====================================================================
+function muzzleDir(m) {
+  const ya = THREE.MathUtils.degToRad(m.yaw || 0);
+  const pi = THREE.MathUtils.degToRad(m.pitch || 0);
+  return new THREE.Vector3(Math.sin(ya) * Math.cos(pi), Math.sin(pi), -Math.cos(ya) * Math.cos(pi));
+}
+
+/**
+ * 弹道有效方向（与游戏中子弹飞行方向完全一致）：
+ * - 战斗机模式（muzzleDirs=null）：敌机 aimLift 恒为 0，方向 = 纯机头 -Z
+ *   对应 aircraft.js getAimDirection()：fwd(0,0,-1) + up×0 = (0,0,-1)
+ * - 轰炸机模式（muzzleDirs 有值）：每个炮塔独立 yaw/pitch 方向
+ *   对应 aircraft.js getMuzzleWorldDirs()：body frame 单位向量经 root 旋转变换
+ */
+function effectiveMuzzleDir(m) {
+  return muzzleDir(m);
+}
+
+function clearMuzzleObjects() {
+  muzzleMarkers.forEach(b => { scene.remove(b); b.geometry.dispose(); b.material.dispose(); });
+  rayLines.forEach(l => { scene.remove(l); l.geometry.dispose(); l.material.dispose(); });
+  muzzleMarkers.length = 0; rayLines.length = 0;
+}
+
+function buildMuzzleObjects() {
+  clearMuzzleObjects();
+  muzzles.forEach(m => {
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(0.35, 12, 12),
+      new THREE.MeshBasicMaterial({ color: 0xff5a4d, depthTest: false })
+    );
+    ball.position.set(m.x, m.y, m.z); ball.renderOrder = 10;
+    scene.add(ball); muzzleMarkers.push(ball);
+
+    const dir = effectiveMuzzleDir(m);
+    const end = new THREE.Vector3(m.x + dir.x * RAY_LEN, m.y + dir.y * RAY_LEN, m.z + dir.z * RAY_LEN);
+    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(m.x, m.y, m.z), end]);
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xff5a4d, transparent: true, opacity: 0.5, depthTest: false }));
+    line.renderOrder = 9; scene.add(line); rayLines.push(line);
+  });
+  // 显隐
+  const showM = document.getElementById('btn-markers').classList.contains('active');
+  const showR = document.getElementById('btn-rays').classList.contains('active');
+  muzzleMarkers.forEach(b => b.visible = showM);
+  rayLines.forEach(l => l.visible = showR);
+}
+
+function updateMuzzles() {
+  muzzles.forEach((m, i) => {
+    if (!muzzleMarkers[i]) return;
+    muzzleMarkers[i].position.set(m.x, m.y, m.z);
+    const dir = effectiveMuzzleDir(m);
+    const arr = rayLines[i].geometry.attributes.position;
+    arr.setXYZ(0, m.x, m.y, m.z);
+    arr.setXYZ(1, m.x + dir.x * RAY_LEN, m.y + dir.y * RAY_LEN, m.z + dir.z * RAY_LEN);
+    arr.needsUpdate = true;
+  });
+}
+
+function pickPresetByUrl(url) {
+  if (url.includes('he111')) return 'he111';
+  if (url.includes('ju88')) return 'ju88';
+  if (url.includes('spitfire')) return 'spitfire';
+  if (url.includes('yak9')) return 'yak9';
+  if (url.includes('il2')) return 'il2';
+  return 'custom';
+}
+
+function applyMuzzlePreset(key) {
+  document.getElementById('muz-preset').value = key;
+  if (key === 'custom') { buildMuzzleUI(); return; }
+  // 优先用 MODEL_CONFIGS 已调好的 muzzleOffsets/muzzleDirs
+  const cfg = MODEL_CONFIGS[currentUrl];
+  if (cfg && cfg.muzzleOffsets && cfg.muzzleOffsets.length && (key === pickPresetByUrl(currentUrl))) {
+    const dirs = cfg.muzzleDirs || [];
+    muzzles = cfg.muzzleOffsets.map((m, i) => {
+      let yaw = 0, pitch = 0;
+      if (dirs[i]) {
+        const d = dirs[i];
+        pitch = THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(d.y, -1, 1)));
+        yaw = THREE.MathUtils.radToDeg(Math.atan2(d.x, -d.z));
+      }
+      const presetName = MUZZLE_PRESETS[key] && MUZZLE_PRESETS[key][i] ? MUZZLE_PRESETS[key][i].name : `炮口${i+1}`;
+      return { name: presetName, x: m.x, y: m.y, z: m.z, yaw, pitch };
+    });
+  } else {
+    const preset = MUZZLE_PRESETS[key];
+    if (!preset) { buildMuzzleUI(); return; }
+    muzzles = preset.map(m => ({ ...m }));
+  }
+  // 根据是否有非朝前炮口自动切换模式
+  const hasTurret = muzzles.some(m => Math.abs(m.yaw || 0) > 0.5 || Math.abs(m.pitch || 0) > 0.5);
+  setMuzzleMode(hasTurret ? 'bomber' : 'fighter');
+  buildMuzzleObjects();
+  buildMuzzleUI();
+}
+
+function setMuzzleMode(mode) {
+  muzzleMode = mode;
+  document.getElementById('mode-fighter').classList.toggle('active', mode === 'fighter');
+  document.getElementById('mode-bomber').classList.toggle('active', mode === 'bomber');
+  updateMuzzleModeHint();
+}
+
+function updateMuzzleModeHint() {
+  const el = document.getElementById('muzzle-mode-hint');
+  if (muzzleMode === 'fighter') {
+    el.innerHTML = '<b>战斗机模式</b>：所有枪口朝机头 -Z（与游戏敌机一致，aimLift=0 纯机头方向）。仅调整每挺枪口位置。<br>轰炸机有自卫炮塔请切到轰炸机模式调 Yaw/Pitch。';
+  } else {
+    el.innerHTML = '<b>轰炸机模式</b>：每个炮口含独立朝向 Yaw/Pitch。<br>Yaw=0/Pitch=0 朝前 -Z；Yaw=180 朝后；Pitch=90 朝上。红球=炮口，红线=弹道。';
+  }
+}
+
+function buildMuzzleUI() {
+  const muzList = document.getElementById('muz-list');
+  muzList.innerHTML = '';
+  document.getElementById('muz-count').textContent = muzzles.length + ' 个';
+  muzzles.forEach((m, i) => {
+    const group = document.createElement('div');
+    group.className = 'muz-group';
+    const showDir = muzzleMode === 'bomber';
+    group.innerHTML =
+      `<div class="muz-head"><span class="muz-title">${i+1}. ${m.name}</span>` +
+      `<button class="muz-del" data-idx="${i}">删除</button></div>` +
+      ['x','y','z'].map(c =>
+        `<div class="ctrl"><label>${c.toUpperCase()}</label>` +
+        `<input type="range" id="mz${i}-${c}" min="-25" max="25" step="0.05" value="${m[c]}">` +
+        `<input type="number" id="mz${i}-${c}-n" class="val" step="0.05" value="${m[c]}"></div>`
+      ).join('') +
+      (showDir ?
+        `<div class="ctrl"><label>Yaw°</label>` +
+        `<input type="range" id="mz${i}-yaw" min="-180" max="180" step="1" value="${m.yaw||0}">` +
+        `<input type="number" id="mz${i}-yaw-n" class="val" step="1" value="${m.yaw||0}"></div>` +
+        `<div class="ctrl"><label>Pitch°</label>` +
+        `<input type="range" id="mz${i}-pitch" min="-90" max="90" step="1" value="${m.pitch||0}">` +
+        `<input type="number" id="mz${i}-pitch-n" class="val" step="1" value="${m.pitch||0}"></div>` : '');
+    muzList.appendChild(group);
+  });
+  // 绑定
+  muzzles.forEach((m, i) => {
+    ['x','y','z'].forEach(c => {
+      bindMuzzleSlider(i, c, v => { m[c] = v; updateMuzzles(); });
+    });
+    if (muzzleMode === 'bomber') {
+      bindMuzzleSlider(i, 'yaw', v => { m.yaw = v; updateMuzzles(); });
+      bindMuzzleSlider(i, 'pitch', v => { m.pitch = v; updateMuzzles(); });
+    }
+  });
+  // 删除按钮
+  muzList.querySelectorAll('.muz-del').forEach(btn => {
+    btn.onclick = () => {
+      const idx = +btn.dataset.idx;
+      muzzles.splice(idx, 1);
+      buildMuzzleObjects(); buildMuzzleUI();
+    };
+  });
+}
+
+function bindMuzzleSlider(i, key, onChange) {
+  const r = document.getElementById(`mz${i}-${key}`);
+  const n = document.getElementById(`mz${i}-${key}-n`);
+  if (!r || !n) return;
+  const apply = (v) => { v = +v; if (Number.isNaN(v)) return; r.value = v; n.value = v; onChange(v); };
+  r.oninput = () => apply(r.value); n.oninput = () => apply(n.value);
+}
+
+function syncMuzzleUI() {
+  // 敌机/友军 aimLift 恒为 0，无瞄准参数 UI 需同步
+}
+
+function bindMuzzleTab() {
+  document.getElementById('mode-fighter').onclick = () => { setMuzzleMode('fighter'); buildMuzzleUI(); };
+  document.getElementById('mode-bomber').onclick = () => { setMuzzleMode('bomber'); buildMuzzleUI(); };
+  document.getElementById('muz-preset').onchange = e => applyMuzzlePreset(e.target.value);
+  document.getElementById('btn-add-muz').onclick = () => {
+    const i = muzzles.length + 1;
+    muzzles.push({ name: `炮口${i}`, x: 0, y: 0, z: -5, yaw: 0, pitch: 0 });
+    buildMuzzleObjects(); buildMuzzleUI();
+  };
+  document.getElementById('btn-markers').onclick = function() {
+    this.classList.toggle('active');
+    muzzleMarkers.forEach(b => b.visible = this.classList.contains('active'));
+  };
+  document.getElementById('btn-rays').onclick = function() {
+    this.classList.toggle('active');
+    rayLines.forEach(l => l.visible = this.classList.contains('active'));
+  };
+}
+
+// ====================================================================
+// Tab 3: 起落架
+// ====================================================================
+function applyGearHide() {
+  if (!model) return;
+  const gearSet = new Set(state.markedGearNames);
+  const previewHide = document.getElementById('btn-hide-gear-preview').classList.contains('active');
+  model.traverse(o => {
+    if (!o.isMesh || !o.name) return;
+    // 还原可见性基准（非起落架默认可见）
+    let isGear = gearSet.has(o.name) || (!state.markedGearNames.length && isGearName(o.name) && state.markedGearNames.length === 0 && false);
+    // 仅用显式标记列表（与游戏一致）
+    isGear = gearSet.has(o.name);
+    if (isGear && previewHide) o.visible = false;
+    else if (isGear) o.visible = true; // 预览关闭时显示
+  });
+  // 高亮标记的起落架节点
+  highlightMarkedNodes();
+  updateGearList();
+}
+
+function highlightMarkedNodes() {
+  const propSet = new Set(state.markedPropNames);
+  const gearSet = new Set(state.markedGearNames);
+  state.nodes.forEach(n => {
+    const mats = Array.isArray(n.mesh.material) ? n.mesh.material : [n.mesh.material];
+    mats.forEach(m => {
+      if (!m) return;
+      if (n.markedProp || propSet.has(n.name)) {
+        m.transparent = false; m.opacity = 1.0;
+        m.emissive = new THREE.Color(0x6fff8a); m.emissiveIntensity = 0.5;
+      } else if (n.markedGear || gearSet.has(n.name)) {
+        m.transparent = false; m.opacity = 1.0;
+        m.emissive = new THREE.Color(0xff5a4d); m.emissiveIntensity = 0.5;
+      } else if (n.name === state.selectedName) {
+        m.transparent = false; m.opacity = 1.0;
+        m.emissive = new THREE.Color(0x6fd0ff); m.emissiveIntensity = 0.4;
+      } else {
+        // 还原
+        m.transparent = m._origTransparent !== undefined ? m._origTransparent : m.transparent;
+        m.opacity = m._origOpacity !== undefined ? m._origOpacity : m.opacity;
+        m.emissive = m._origEmissive ? m._origEmissive.clone() : (m.emissive ? m.emissive.set(0) : null);
+        m.emissiveIntensity = m._origEmissiveI !== undefined ? m._origEmissiveI : m.emissiveIntensity;
+      }
+    });
+  });
+}
+
+function updateGearList() {
+  const el = document.getElementById('gear-list');
+  document.getElementById('gear-count').textContent = state.markedGearNames.length + ' 个';
+  if (!state.markedGearNames.length) { el.textContent = '无（点击左侧节点 + 标记为起落架）'; return; }
+  el.innerHTML = state.markedGearNames.map(n => `<div style="color:var(--gear)">• ${n}</div>`).join('');
+}
+
+function bindGearTab() {
+  document.getElementById('btn-mark-gear').onclick = () => {
+    if (!state.selectedName) { alert('请先在左侧节点列表点击选中一个节点'); return; }
+    const n = state.nodes.find(x => x.name === state.selectedName);
+    if (!n) return;
+    n.markedGear = !n.markedGear;
+    if (n.markedGear) {
+      if (!state.markedGearNames.includes(n.name)) state.markedGearNames.push(n.name);
+      n.markedProp = false;
+      state.markedPropNames = state.markedPropNames.filter(x => x !== n.name);
+    } else {
+      state.markedGearNames = state.markedGearNames.filter(x => x !== n.name);
+    }
+    renderNodeList(); applyGearHide();
+  };
+  document.getElementById('btn-clear-gear').onclick = () => {
+    state.nodes.forEach(n => n.markedGear = false);
+    state.markedGearNames = [];
+    renderNodeList(); applyGearHide();
+  };
+  document.getElementById('btn-auto-detect-gear').onclick = () => {
+    state.nodes.forEach(n => {
+      if (isGearName(n.name) && !n.markedProp) {
+        n.markedGear = true;
+        if (!state.markedGearNames.includes(n.name)) state.markedGearNames.push(n.name);
+      }
+    });
+    renderNodeList(); applyGearHide();
+    setStatus('已按关键词自动检测起落架节点: ' + state.markedGearNames.length + ' 个', 'ok');
+  };
+  document.getElementById('btn-hide-gear-preview').onclick = function() {
+    this.classList.toggle('active');
+    applyGearHide();
+  };
+}
+
+// ====================================================================
+// Tab 4: 螺旋桨（移植自 tune_prop.js）
+// ====================================================================
+function clearPropSetup() {
+  blades = [];
+  multiPivots = []; propTilts = [];
+  propRigs.forEach(r => r.parent && r.parent.remove(r)); propRigs = [];
+  bladeCentersModel = []; baseCentersModel = [];
+  propBboxModel = null;
+  blurDiscs.forEach(d => d.parent && d.parent.remove(d)); blurDiscs = [];
+  pivotMarkers.forEach(m => scene.remove(m)); pivotMarkers = [];
+  if (axisHelper) { scene.remove(axisHelper); axisHelper = null; }
+}
+
+function setupProp() {
+  clearPropSetup();
+  if (!model) return;
+  const propNames = state.markedPropNames.length ? state.markedPropNames : (MODEL_CONFIGS[currentUrl]?.propNodes || null);
+  if (propNames && propNames.length) {
+    const set = new Set(propNames);
+    model.traverse(o => { if (o.name && set.has(o.name)) blades.push(o); });
+  } else {
+    model.traverse(o => { if (isPropName(o.name)) blades.push(o); });
+  }
+  if (!blades.length) return;
+
+  // 深拷贝桨叶材质
+  blades.forEach(b => b.traverse(o => {
+    if (o.isMesh && o.material) {
+      if (Array.isArray(o.material)) o.material = o.material.map(m => m.clone());
+      else o.material = o.material.clone();
+    }
+  }));
+
+  // 计算每片桨叶模型空间中心（旋转前只算一次）
+  model.updateWorldMatrix(true, true);
+  bladeCentersModel = blades.map(b => {
+    const tmpBox = new THREE.Box3().setFromObject(b);
+    const c = new THREE.Vector3(); tmpBox.getCenter(c);
+    return model.worldToLocal(c);
+  });
+  recomputeBaseCenters();
+
+  // 桨叶包围盒
+  {
+    const tmpBox = new THREE.Box3();
+    blades.forEach(b => tmpBox.expandByObject(b));
+    const c = new THREE.Vector3(); tmpBox.getCenter(c);
+    propBboxModel = {
+      min: model.worldToLocal(tmpBox.min.clone()),
+      max: model.worldToLocal(tmpBox.max.clone()),
+      center: model.worldToLocal(c),
+    };
+  }
+  computeBladeRadius();
+  // propBlurOnly：仅半透明不旋转
+  if (propState.blurOnly) {
+    blades.forEach(b => b.traverse(o => {
+      if (!o.isMesh || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach(m => { m.transparent = true; m.opacity = propState.opacity; });
+    }));
+    return;
+  }
+  rebuildPivot();
+  applyOpacity();
+  applyWireframe();
+  applyBodyVisibility();
+  updateDebugVisuals();
+}
+
+function recomputeBaseCenters() {
+  baseCentersModel = [];
+  if (!bladeCentersModel.length) return;
+  if (propState.singleGroup) {
+    const avg = new THREE.Vector3();
+    bladeCentersModel.forEach(c => avg.add(c));
+    avg.divideScalar(bladeCentersModel.length);
+    baseCentersModel.push(avg);
+  } else {
+    bladeCentersModel.forEach(c => baseCentersModel.push(c.clone()));
+  }
+}
+
+function rebuildPivot() {
+  if (!blades.length || !baseCentersModel.length) return;
+  const oldSpins = multiPivots.slice();
+  const savedQuats = oldSpins.map(p => p.quaternion.clone());
+
+  if (modelRoot) modelRoot.updateWorldMatrix(true, true);
+
+  const groups = [];
+  if (propState.singleGroup) {
+    const wc = model.localToWorld(baseCentersModel[0].clone());
+    wc.x += propState.pivotOffset.x; wc.y += propState.pivotOffset.y; wc.z += propState.pivotOffset.z;
+    groups.push({ center: wc, blades: blades.slice() });
+  } else {
+    blades.forEach((b, idx) => {
+      const wc = model.localToWorld(baseCentersModel[idx].clone());
+      wc.x += propState.pivotOffset.x; wc.y += propState.pivotOffset.y; wc.z += propState.pivotOffset.z;
+      groups.push({ center: wc, blades: [b] });
+    });
+  }
+
+  multiPivots = []; propTilts = [];
+  propRigs.forEach(r => r.parent && r.parent.remove(r)); propRigs = [];
+
+  groups.forEach((g, idx) => {
+    const rig = new THREE.Group();
+    rig.name = `_propRig_${idx}`; rig.position.copy(g.center);
+    scene.add(rig); propRigs.push(rig);
+
+    const tilt = new THREE.Group();
+    tilt.name = `_propTilt_${idx}`;
+    tilt.rotation.x = propState.axisTilt.x * Math.PI / 180;
+    tilt.rotation.y = propState.axisTilt.y * Math.PI / 180;
+    rig.add(tilt); propTilts.push(tilt);
+
+    const spin = new THREE.Group();
+    spin.name = `_propSpin_${idx}`;
+    tilt.add(spin);
+    rig.updateWorldMatrix(true, true);
+    if (savedQuats[idx]) spin.quaternion.copy(savedQuats[idx]);
+    multiPivots.push(spin);
+
+    g.blades.forEach(b => spin.attach(b));
+  });
+
+  createBlurDiscs();
+  updateDebugVisuals();
+}
+
+function computeBladeRadius() {
+  if (!propBboxModel) { bladeRadius = 1; return; }
+  const { min, max, center } = propBboxModel;
+  const corners = [];
+  for (const x of [min.x, max.x]) for (const y of [min.y, max.y]) for (const z of [min.z, max.z]) corners.push({x,y,z});
+  let maxDist = 0;
+  corners.forEach(c => {
+    let d;
+    if (propState.spinAxis === 'z') d = Math.hypot(c.x - center.x, c.y - center.y);
+    else if (propState.spinAxis === 'y') d = Math.hypot(c.x - center.x, c.z - center.z);
+    else d = Math.hypot(c.y - center.y, c.z - center.z);
+    if (d > maxDist) maxDist = d;
+  });
+  bladeRadius = maxDist * 0.95 || 1;
+}
+
+let _blurTexture = null;
+function getBlurTexture() {
+  if (_blurTexture) return _blurTexture;
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  grad.addColorStop(0.00, 'rgba(200,165,20,0.5)');
+  grad.addColorStop(0.10, 'rgba(200,165,20,0.35)');
+  grad.addColorStop(0.16, 'rgba(10,10,10,0.85)');
+  grad.addColorStop(0.85, 'rgba(12,12,12,0.6)');
+  grad.addColorStop(1.00, 'rgba(12,12,12,0)');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, size, size);
+  _blurTexture = new THREE.CanvasTexture(canvas);
+  return _blurTexture;
+}
+
+function createBlurDiscs() {
+  blurDiscs.forEach(d => d.parent && d.parent.remove(d)); blurDiscs = [];
+  if (!propState.blurDisc) return;
+  propTilts.forEach(tilt => {
+    const geo = new THREE.CircleGeometry(bladeRadius, 64);
+    const mat = new THREE.MeshBasicMaterial({ map: getBlurTexture(), transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    const disc = new THREE.Mesh(geo, mat);
+    if (propState.spinAxis === 'y') disc.rotation.x = Math.PI / 2;
+    else if (propState.spinAxis === 'x') disc.rotation.y = Math.PI / 2;
+    tilt.add(disc); blurDiscs.push(disc);
+  });
+  updateBlurOpacity();
+}
+
+function updateBlurOpacity() {
+  const speedFactor = Math.min(1, propState.spinSpeed / 120);
+  const opacity = propState.blurStrength * speedFactor * 0.6;
+  blurDiscs.forEach(d => { if (d.material) d.material.opacity = opacity; d.visible = opacity > 0.01; });
+}
+
+function applyAxisTilt() {
+  propTilts.forEach(t => {
+    t.rotation.x = propState.axisTilt.x * Math.PI / 180;
+    t.rotation.y = propState.axisTilt.y * Math.PI / 180;
+  });
+  updateDebugVisuals();
+}
+
+function applyOpacity() {
+  if (propState.blurOnly) {
+    blades.forEach(b => b.traverse(o => {
+      if (!o.isMesh || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach(m => { m.transparent = true; m.opacity = propState.opacity; });
+    }));
+    return;
+  }
+  blades.forEach(b => b.traverse(o => {
+    if (!o.isMesh || !o.material) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    mats.forEach(m => { m.transparent = true; m.opacity = propState.opacity; });
+  }));
+}
+
+function applyWireframe() {
+  const applyTo = (obj) => { if (!obj) return; obj.traverse(o => { if (o.isMesh && o.material) { const ms = Array.isArray(o.material)?o.material:[o.material]; ms.forEach(m => m.wireframe = propState.wireframe); } }); };
+  if (model) applyTo(model);
+  blades.forEach(b => applyTo(b));
+}
+
+function applyBodyVisibility() {
+  if (!model) return;
+  const bladeSet = new Set(blades);
+  model.traverse(o => {
+    if (!o.isMesh) return;
+    let isBlade = bladeSet.has(o);
+    if (!isBlade) { let p = o.parent; while (p) { if (bladeSet.has(p)) { isBlade = true; break; } p = p.parent; } }
+    if (isBlade) return;
+    if (propState.bodyVisibility === 'hidden') o.visible = false;
+    else if (propState.bodyVisibility === 'ghost') {
+      o.visible = true;
+      const ms = Array.isArray(o.material)?o.material:[o.material];
+      ms.forEach(m => { m.transparent = true; m.opacity = 0.15; });
+    } else {
+      o.visible = true;
+    }
+  });
+}
+
+function updateDebugVisuals() {
+  // 桨毂标记
+  pivotMarkers.forEach(m => scene.remove(m)); pivotMarkers = [];
+  if (propState.showPivotMarker && multiPivots.length) {
+    multiPivots.forEach((p, i) => {
+      const wp = new THREE.Vector3(); p.getWorldPosition(wp);
+      const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), new THREE.MeshBasicMaterial({ color: 0xff3030 }));
+      sphere.position.copy(wp); scene.add(sphere); pivotMarkers.push(sphere);
+    });
+  }
+  // 旋转轴
+  if (axisHelper) { scene.remove(axisHelper); axisHelper = null; }
+  if (propState.showAxis && propTilts.length) {
+    const wp = new THREE.Vector3(); propTilts[0].getWorldPosition(wp);
+    const baseAxis = propState.spinAxis === 'z' ? new THREE.Vector3(0,0,1) : propState.spinAxis === 'y' ? new THREE.Vector3(0,1,0) : new THREE.Vector3(1,0,0);
+    const tq = new THREE.Quaternion(); propTilts[0].getWorldQuaternion(tq);
+    const av = baseAxis.applyQuaternion(tq);
+    const geo = new THREE.BufferGeometry().setFromPoints([wp.clone().sub(av.clone().multiplyScalar(4)), wp.clone().add(av.clone().multiplyScalar(4))]);
+    axisHelper = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffb84d, linewidth: 2 }));
+    scene.add(axisHelper);
+  }
+}
+
+function syncPropUI() {
+  document.getElementById('spin-speed').value = propState.spinSpeed;
+  document.getElementById('spin-speed-v').textContent = propState.spinSpeed;
+  document.getElementById('spin-axis').value = propState.spinAxis;
+  document.getElementById('auto-rotate').checked = propState.autoRotate;
+  ['x','y','z'].forEach(c => {
+    document.getElementById('pivot-' + c).value = propState.pivotOffset[c];
+    document.getElementById('pivot-' + c + '-v').value = propState.pivotOffset[c];
+  });
+  ['x','y'].forEach(c => {
+    document.getElementById('tilt-' + c).value = propState.axisTilt[c];
+    document.getElementById('tilt-' + c + '-v').value = propState.axisTilt[c];
+  });
+  document.getElementById('opacity').value = propState.opacity;
+  document.getElementById('opacity-v').textContent = propState.opacity.toFixed(2);
+  document.getElementById('blur-disc').checked = propState.blurDisc;
+  document.getElementById('blur-strength').value = propState.blurStrength;
+  document.getElementById('blur-strength-v').textContent = propState.blurStrength.toFixed(2);
+  document.getElementById('multi-prop').checked = propState.multiProp;
+  document.getElementById('blur-only').checked = propState.blurOnly;
+  document.getElementById('show-pivot-marker').checked = propState.showPivotMarker;
+  document.getElementById('show-axis').checked = propState.showAxis;
+  document.getElementById('wireframe').checked = propState.wireframe;
+  document.getElementById('body-visibility').value = propState.bodyVisibility;
+  document.getElementById('btn-single-group').classList.toggle('active', propState.singleGroup);
+  document.getElementById('btn-multi-group').classList.toggle('active', !propState.singleGroup);
+}
+
+function bindPropTab() {
+  const bind = (id, vid, setter, fmt) => {
+    const r = document.getElementById(id), n = document.getElementById(vid);
+    const apply = v => { v = +v; if (Number.isNaN(v)) return; r.value = v; if (n) n.value = fmt ? fmt(v) : v; setter(v); };
+    r.oninput = () => apply(r.value); if (n) n.oninput = () => apply(n.value);
+  };
+  document.getElementById('spin-speed').oninput = e => {
+    propState.spinSpeed = +e.target.value;
+    document.getElementById('spin-speed-v').textContent = propState.spinSpeed;
+    updateBlurOpacity();
+  };
+  document.getElementById('spin-axis').onchange = e => {
+    propState.spinAxis = e.target.value;
+    computeBladeRadius(); createBlurDiscs(); updateDebugVisuals();
+  };
+  document.getElementById('auto-rotate').onchange = e => propState.autoRotate = e.target.checked;
+  bind('pivot-x', 'pivot-x-v', v => { propState.pivotOffset.x = v; rebuildPivot(); }, v => v);
+  bind('pivot-y', 'pivot-y-v', v => { propState.pivotOffset.y = v; rebuildPivot(); }, v => v);
+  bind('pivot-z', 'pivot-z-v', v => { propState.pivotOffset.z = v; rebuildPivot(); }, v => v);
+  bind('tilt-x', 'tilt-x-v', v => { propState.axisTilt.x = v; applyAxisTilt(); }, v => v);
+  bind('tilt-y', 'tilt-y-v', v => { propState.axisTilt.y = v; applyAxisTilt(); }, v => v);
+  document.getElementById('btn-reset-pivot').onclick = () => {
+    propState.pivotOffset = { x: 0, y: 0, z: 0 };
+    syncPropUI(); rebuildPivot();
+  };
+  document.getElementById('opacity').oninput = e => {
+    propState.opacity = +e.target.value;
+    document.getElementById('opacity-v').textContent = propState.opacity.toFixed(2);
+    applyOpacity();
+  };
+  document.getElementById('blur-disc').onchange = e => {
+    propState.blurDisc = e.target.checked;
+    createBlurDiscs();
+  };
+  document.getElementById('blur-strength').oninput = e => {
+    propState.blurStrength = +e.target.value;
+    document.getElementById('blur-strength-v').textContent = propState.blurStrength.toFixed(2);
+    updateBlurOpacity();
+  };
+  document.getElementById('multi-prop').onchange = e => {
+    propState.multiProp = e.target.checked;
+    if (propState.multiProp) { propState.singleGroup = false; document.getElementById('btn-multi-group').classList.add('active'); document.getElementById('btn-single-group').classList.remove('active'); }
+    recomputeBaseCenters(); rebuildPivot();
+  };
+  document.getElementById('blur-only').onchange = e => {
+    propState.blurOnly = e.target.checked;
+    setupProp();
+  };
+  document.getElementById('btn-single-group').onclick = () => {
+    propState.singleGroup = true;
+    document.getElementById('btn-single-group').classList.add('active');
+    document.getElementById('btn-multi-group').classList.remove('active');
+    recomputeBaseCenters(); rebuildPivot();
+  };
+  document.getElementById('btn-multi-group').onclick = () => {
+    propState.singleGroup = false;
+    document.getElementById('btn-multi-group').classList.add('active');
+    document.getElementById('btn-single-group').classList.remove('active');
+    recomputeBaseCenters(); rebuildPivot();
+  };
+  document.getElementById('body-visibility').onchange = e => {
+    propState.bodyVisibility = e.target.value; applyBodyVisibility();
+  };
+  document.getElementById('show-pivot-marker').onchange = e => { propState.showPivotMarker = e.target.checked; updateDebugVisuals(); };
+  document.getElementById('show-axis').onchange = e => { propState.showAxis = e.target.checked; updateDebugVisuals(); };
+  document.getElementById('wireframe').onchange = e => { propState.wireframe = e.target.checked; applyWireframe(); };
+
+  // 螺旋桨标记按钮
+  document.getElementById('btn-mark-prop').onclick = () => {
+    if (!state.selectedName) { alert('请先在左侧节点列表点击选中一个节点'); return; }
+    const n = state.nodes.find(x => x.name === state.selectedName);
+    if (!n) return;
+    n.markedProp = !n.markedProp;
+    if (n.markedProp) {
+      if (!state.markedPropNames.includes(n.name)) state.markedPropNames.push(n.name);
+      n.markedGear = false;
+      state.markedGearNames = state.markedGearNames.filter(x => x !== n.name);
+    } else {
+      state.markedPropNames = state.markedPropNames.filter(x => x !== n.name);
+    }
+    renderNodeList(); highlightMarkedNodes(); setupProp();
+  };
+  document.getElementById('btn-clear-prop').onclick = () => {
+    state.nodes.forEach(n => n.markedProp = false);
+    state.markedPropNames = [];
+    renderNodeList(); highlightMarkedNodes(); setupProp();
+  };
+  document.getElementById('btn-auto-detect-prop').onclick = () => {
+    state.nodes.forEach(n => {
+      if (isPropName(n.name) && !n.markedGear) {
+        n.markedProp = true;
+        if (!state.markedPropNames.includes(n.name)) state.markedPropNames.push(n.name);
+      }
+    });
+    renderNodeList(); highlightMarkedNodes(); setupProp();
+    setStatus('已按关键词自动检测螺旋桨节点: ' + state.markedPropNames.length + ' 个', 'ok');
+  };
+  document.getElementById('btn-rebuild-prop').onclick = () => setupProp();
+}
+
+// ====================================================================
+// 节点列表
+// ====================================================================
+function sortedNodes() {
+  let arr = [...state.nodes];
+  if (state.filter) {
+    const f = state.filter.toLowerCase();
+    arr = arr.filter(n => n.name.toLowerCase().includes(f));
+  }
+  if (state.sortOrder === 'y') arr.sort((a, b) => a.y - b.y);
+  else arr.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  return arr;
+}
+
+function renderNodeList() {
+  const el = document.getElementById('node-list');
+  el.innerHTML = '';
+  const arr = sortedNodes();
+  arr.forEach(n => {
+    const row = document.createElement('div');
+    row.className = 'node-row';
+    if (n.markedProp) row.classList.add('prop');
+    if (n.markedGear) row.classList.add('gear');
+    if (n.name === state.selectedName) row.classList.add('selected');
+    if (!n.mesh.visible) row.classList.add('hidden-node');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = n.mesh.visible;
+    cb.onclick = e => e.stopPropagation();
+    cb.onchange = () => { n.mesh.visible = cb.checked; n.visible = cb.checked; renderNodeList(); };
+    const name = document.createElement('span'); name.className = 'name'; name.textContent = n.name;
+    name.title = n.name;
+    const info = document.createElement('span'); info.className = 'info';
+    info.textContent = `Y=${n.y.toFixed(1)}`;
+    row.appendChild(cb); row.appendChild(name); row.appendChild(info);
+    if (n.markedProp) { const t = document.createElement('span'); t.className = 'tag prop'; t.textContent = '桨'; row.appendChild(t); }
+    if (n.markedGear) { const t = document.createElement('span'); t.className = 'tag gear'; t.textContent = '架'; row.appendChild(t); }
+    row.onclick = e => { if (e.target === cb) return; selectNode(n.name); };
+    el.appendChild(row);
+  });
+}
+
+function selectNode(name) {
+  state.selectedName = name;
+  highlightMarkedNodes();
+  renderNodeList();
+}
+
+function bindNodePanel() {
+  document.getElementById('btn-sort-y').onclick = () => { state.sortOrder = 'y'; renderNodeList(); };
+  document.getElementById('btn-sort-name').onclick = () => { state.sortOrder = 'name'; renderNodeList(); };
+  document.getElementById('node-filter').oninput = e => { state.filter = e.target.value; renderNodeList(); };
+}
+
+// ====================================================================
+// 参考飞机
+// ====================================================================
+function loadReference(url) {
+  if (refGroup) { scene.remove(refGroup); refGroup = null; }
+  if (!url) return;
+  loader.load(url, (gltf) => {
+    const m = gltf.scene;
+    const cfg = MODEL_CONFIGS[url] || {};
+    const box = new THREE.Box3().setFromObject(m);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const longest = Math.max(size.x, size.y, size.z) || 1;
+    const bs = 9 / longest;
+    const s = bs * (cfg.userScale || 3.6);
+    m.scale.setScalar(s);
+    m.position.copy(center).multiplyScalar(-s);
+    const yaw = computeAutoOrient(m, cfg);
+    refGroup = new THREE.Group();
+    refGroup.add(m);
+    refGroup.rotation.set(
+      THREE.MathUtils.degToRad(cfg.pitchOffset || 0),
+      THREE.MathUtils.degToRad(cfg.autoOrient === false ? (cfg.yawOffset || 0) : yaw),
+      THREE.MathUtils.degToRad(cfg.rollOffset || 0),
+      'YXZ'
+    );
+    scene.add(refGroup);
+    // 半透明
+    m.traverse(o => {
+      if (o.isMesh && o.material) {
+        o.material = (Array.isArray(o.material) ? o.material[0] : o.material).clone();
+        o.material.transparent = true; o.material.opacity = 0.35; o.material.depthWrite = false;
+      }
+    });
+  });
+}
+
+// ====================================================================
+// 相机预设
+// ====================================================================
+function setCam(m) {
+  camMode = m;
+  ['chase','side','top','front'].forEach(k => {
+    document.getElementById('btn-cam-' + k).classList.toggle('active', k === m);
+  });
+  // 直接定位（OrbitControls 会接管）
+  const off = camOffsets[m];
+  camera.position.copy(off);
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+// ====================================================================
+// 导出系统
+// ====================================================================
+function fmtVec(v, prec = 2) {
+  const sx = (v.x >= 0 ? ' ' : '') + v.x.toFixed(prec);
+  const sy = v.y.toFixed(prec);
+  const sz = (v.z >= 0 ? ' ' : '') + v.z.toFixed(prec);
+  return `new THREE.Vector3(${sx}, ${sy}, ${sz})`;
+}
+
+function exportBase() {
+  return `// ① 基础坐标与比例 → MODEL_CONFIGS['${currentUrl}']
+autoOrient: ${base.autoOrient},
+yawOffset: ${base.yaw.toFixed(1)},
+pitchOffset: ${base.pitch.toFixed(1)},
+rollOffset: ${base.roll.toFixed(1)},
+userScale: ${base.scale.toFixed(2)},
+${(Math.abs(base.cx)+Math.abs(base.cy)+Math.abs(base.cz) > 0.01) ? `centerOffset: [${base.cx.toFixed(2)}, ${base.cy.toFixed(2)}, ${base.cz.toFixed(2)}], // body frame 世界单位` : '// centerOffset: [0,0,0]'}`;
+}
+
+function exportMuzzle() {
+  const lines = muzzles.map(m => `  ${fmtVec({x:m.x,y:m.y,z:m.z}, 2)}, // ${m.name}`);
+  const allForward = muzzles.every(m => Math.abs(m.yaw||0) < 0.5 && Math.abs(m.pitch||0) < 0.5);
+  let dirSection = '';
+  if (!allForward) {
+    const dirLines = muzzles.map(m => {
+      const d = muzzleDir(m);
+      return `  ${fmtVec(d, 3)}, // ${m.name} (yaw=${(m.yaw||0).toFixed(0)}° pitch=${(m.pitch||0).toFixed(0)}°)`;
+    });
+    dirSection = `muzzleDirs: [\n${dirLines.join('\n')}\n  ],`;
+  }
+  return `// ② 机枪炮口 → MODEL_CONFIGS['${currentUrl}']
+muzzleOffsets: [
+${lines.join('\n')}
+],${allForward ? '' : '\n' + dirSection}`;
+}
+
+function exportGear() {
+  if (!state.markedGearNames.length) return `// ③ 起落架 → 无标记节点（关键词自动匹配）\n// hideGear: false`;
+  return `// ③ 起落架 → MODEL_CONFIGS['${currentUrl}']
+hideGear: true,
+hideGearNodes: ${JSON.stringify(state.markedGearNames, null, 2).replace(/\n/g, '\n  ')},`;
+}
+
+function exportProp() {
+  const propNodes = state.markedPropNames.length ? state.markedPropNames : (MODEL_CONFIGS[currentUrl]?.propNodes || []);
+  let lines = [];
+  if (propNodes.length) lines.push(`propNodes: ${JSON.stringify(propNodes)},`);
+  // 螺旋桨转速：默认 300（PROP_SPIN），仅非默认值才导出（喷火 95 等）
+  if (propState.spinSpeed !== 300) lines.push(`propSpinSpeed: ${propState.spinSpeed},`);
+  if (Math.abs(propState.opacity - 0.22) > 0.001) lines.push(`propOpacity: ${propState.opacity.toFixed(2)},`);
+  if (propState.blurDisc) {
+    lines.push(`propBlurDisc: true,`);
+    if (Math.abs(propState.blurStrength - 0.35) > 0.001) lines.push(`propBlurStrength: ${propState.blurStrength.toFixed(2)},`);
+  }
+  if (propState.multiProp) lines.push(`multiProp: true,`);
+  if (propState.blurOnly) lines.push(`propBlurOnly: true,`);
+  if (Math.abs(propState.axisTilt.x) > 0.01 || Math.abs(propState.axisTilt.y) > 0.01)
+    lines.push(`propAxisTilt: { x: ${propState.axisTilt.x.toFixed(1)}, y: ${propState.axisTilt.y.toFixed(1)} },`);
+  if (Math.abs(propState.pivotOffset.x) > 0.001 || Math.abs(propState.pivotOffset.y) > 0.001 || Math.abs(propState.pivotOffset.z) > 0.001)
+    lines.push(`propPivotOffset: { x: ${propState.pivotOffset.x.toFixed(3)}, y: ${propState.pivotOffset.y.toFixed(3)}, z: ${propState.pivotOffset.z.toFixed(3)} },`);
+  if (!lines.length) return `// ④ 螺旋桨 → 无特殊参数（用默认值 PROP_SPIN=300, opacity=0.22）`;
+  return `// ④ 螺旋桨 → MODEL_CONFIGS['${currentUrl}']\n${lines.join('\n')}`;
+}
+
+function exportAll() {
+  const parts = [exportBase(), exportMuzzle(), exportGear(), exportProp()];
+  const fname = currentUrl.split('/').pop();
+  const note = `// 粘贴到 js/enemy.js 的 MODEL_CONFIGS 注册表
+// 敌机/友军机型，aimLift 恒为 0，弹道=纯机头方向（getAimDirection 退化）`;
+  return `// ========== 模型预处理配置 · ${fname} ==========
+${note}
+'/model/${fname}': {
+${parts.map(p => p.split('\n').filter(l => !l.startsWith('//')).map(l => '  ' + l).join('\n')).join('\n')}
+},`;
+}
+
+function showExport(which) {
+  let text = '';
+  if (which === 'all') text = exportAll();
+  else if (which === 'base') text = exportBase();
+  else if (which === 'muzzle') text = exportMuzzle();
+  else if (which === 'gear') text = exportGear();
+  else if (which === 'prop') text = exportProp();
+  document.getElementById('export-text').value = text;
+  document.getElementById('export-modal').classList.add('show');
+  // 高亮当前 tab
+  document.querySelectorAll('.export-tabs button').forEach(b => b.classList.toggle('active', b.dataset.export === which));
+}
+
+function bindExport() {
+  document.getElementById('btn-export').onclick = () => showExport('all');
+  document.querySelectorAll('.export-tabs button').forEach(b => {
+    b.onclick = () => showExport(b.dataset.export);
+  });
+  document.getElementById('btn-copy-export').onclick = async () => {
+    const txt = document.getElementById('export-text').value;
+    try {
+      await navigator.clipboard.writeText(txt);
+      const btn = document.getElementById('btn-copy-export');
+      btn.textContent = '✓ 已复制'; setTimeout(() => btn.textContent = '复制到剪贴板', 1500);
+    } catch (e) {
+      const ta = document.getElementById('export-text'); ta.select(); document.execCommand('copy');
+      const btn = document.getElementById('btn-copy-export');
+      btn.textContent = '✓ 已复制'; setTimeout(() => btn.textContent = '复制到剪贴板', 1500);
+    }
+  };
+  document.getElementById('btn-close-export').onclick = () => document.getElementById('export-modal').classList.remove('show');
+}
+
+// ====================================================================
+// Tab 切换
+// ====================================================================
+function bindTabs() {
+  document.querySelectorAll('.tabs button').forEach(btn => {
+    btn.onclick = () => {
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + tab));
+    };
+  });
+}
+
+// ====================================================================
+// 状态条
+// ====================================================================
+function setStatus(msg, cls) {
+  const el = document.getElementById('status');
+  el.textContent = msg; el.className = cls || '';
+}
+
+// ====================================================================
+// 主循环
+// ====================================================================
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  // 螺旋桨旋转
+  if (propState.autoRotate && multiPivots.length && !propState.blurOnly) {
+    const angle = propState.spinSpeed * dt;
+    multiPivots.forEach(p => {
+      if (propState.spinAxis === 'z') p.rotateZ(angle);
+      else if (propState.spinAxis === 'y') p.rotateY(angle);
+      else p.rotateX(angle);
+    });
+  }
+  // 天空跟随相机
+  if (scene.sky) scene.sky.position.copy(camera.position);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ====================================================================
+// 启动
+// ====================================================================
+function start() {
+  init();
+  // 填充模型选择
+  const sel = document.getElementById('model-sel');
+  MODEL_LIST.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.url; opt.textContent = m.name + (m.role === 'bomber' ? ' [轰炸]' : '');
+    sel.appendChild(opt);
+  });
+  sel.value = MODEL_LIST[0].url;  // 默认选中首个敌机模型
+  // 填充参考飞机选择
+  const refSel = document.getElementById('ref-select');
+  MODEL_LIST.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.url; opt.textContent = m.name;
+    refSel.appendChild(opt);
+  });
+
+  bindTabs();
+  bindBaseTab();
+  bindMuzzleTab();
+  bindGearTab();
+  bindPropTab();
+  bindNodePanel();
+  bindExport();
+
+  // 顶栏按钮
+  document.getElementById('btn-load').onclick = () => loadModel(sel.value);
+  sel.onchange = () => { /* 不自动加载，等点"加载" */ };
+  document.getElementById('ref-select').onchange = e => loadReference(e.target.value);
+  document.getElementById('btn-apply-refresh').onclick = () => {
+    // 重新加载模型并应用所有当前 Tab 参数
+    loadModel(currentUrl || sel.value, true);
+  };
+  document.getElementById('btn-open-game').onclick = () => window.open('/index.html', '_blank');
+
+  // 相机预设
+  ['chase','side','top','front'].forEach(m => {
+    document.getElementById('btn-cam-' + m).onclick = () => setCam(m);
+  });
+
+  animate();
+  // 自动加载首个敌机模型（Spitfire）
+  loadModel(MODEL_LIST[0].url);
+}
+
+start();
+
+// 调试钩子
+window.__tuner = { state, base, muzzles, propState, scene, camera, model, loadModel, applyBaseTransform, setupProp, exportAll };
+</script>
+</body>
+</html>

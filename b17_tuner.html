@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B-17 轰炸机调试台</title>
+<!--
+  B-17 轰炸机专用调试页（仿 player_tuner_me262.html 结构/交互/视觉）。
+  差异：
+    - 非玩家机：无机舱视角/飞行物理页 → 改为 炮塔/发动机/命中球/参数 页
+    - 4 螺旋桨节点 helice03_FACES01~04（rotateZ 每帧）；模型自带半透明模糊盘（Cylinder15~22 系列），仅显隐开关
+    - 4 炮塔（ball/top/tail/cheek）：枪口点×2 + 射界（yawCenter/yawRange/pitchCenter/pitchRange）+ 锥形 wireframe 辅助线
+    - 渲染管线严格复刻 aircraft.js（_normalize -> _autoOrient -> _applyCalibration），target 最长边 9
+    - 默认值：enemy.js MODEL_CONFIGS['/model/b17.glb'] + level_04_berlin.js bomberStream
+  导出片段 -> js/config/levels/level_04_berlin.js 的 bomberStream / js/enemy.js MODEL_CONFIGS。
+-->
+<style>
+  :root {
+    --panel: rgba(12, 18, 22, 0.90);
+    --panel-solid: #0c1216;
+    --line: rgba(120, 180, 210, 0.30);
+    --line-strong: rgba(120, 180, 210, 0.55);
+    --accent: #6fd0ff;
+    --warn: #ffb84d;
+    --fire: #ff5a4d;
+    --text: #d7e6ee;
+    --muted: #8aa0ad;
+    --muz: #ffb84d;
+    --noz: #ff7a3d;
+    --bg: #05080a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; font-size: 13px; }
+  #scene { display: block; width: 100vw; height: 100vh; }
+
+  /* ===== 顶栏 ===== */
+  #topbar { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 11;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 22px;
+    padding: 6px 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: 96vw; }
+  #topbar label { color: var(--muted); font-size: 12px; }
+  #topbar button { background: rgba(111,208,255,.10); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--text); padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  #topbar button:hover { background: rgba(111,208,255,.22); }
+  #topbar button.warn { color: var(--warn); border-color: rgba(255,184,77,.4); }
+  #topbar small { color: var(--muted); font-size: 11px; }
+  #topbar .title { color: var(--accent); letter-spacing: 2px; font-size: 13px; font-weight: 600; }
+
+  /* ===== 右侧 Tab 面板 ===== */
+  #panel { position: fixed; top: 60px; right: 10px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    width: 360px; max-height: calc(100vh - 90px); display: flex; flex-direction: column;
+    backdrop-filter: blur(6px); }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .tabs button { flex: 1; background: transparent; border: none; color: var(--muted);
+    padding: 8px 4px; font-size: 11px; cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all .15s; }
+  .tabs button:hover { color: var(--text); background: rgba(111,208,255,.06); }
+  .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(111,208,255,.08); }
+  .tab-content { display: none; padding: 10px 12px; overflow-y: auto; flex: 1; }
+  .tab-content.active { display: block; }
+  .tab-content h4 { color: var(--accent); letter-spacing: 1px; margin: 12px 0 6px; font-size: 11px;
+    border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+  .tab-content h4:first-child { margin-top: 0; }
+  .tab-content h4 .sub { color: var(--muted); font-size: 10px; font-weight: normal; letter-spacing: 0; float: right; }
+  .ctrl { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .ctrl label { width: 92px; color: var(--muted); font-size: 11px; }
+  .ctrl input[type=range] { flex: 1; min-width: 50px; }
+  .ctrl .val { width: 60px; text-align: right; color: var(--accent); font-variant-numeric: tabular-nums; font-size: 11px; }
+  .ctrl input[type=number].val {
+    background: rgba(0,0,0,.4); border: 1px solid var(--line); border-radius: 3px;
+    padding: 2px 4px; font-size: 11px; font-family: Consolas, monospace; color: var(--accent); }
+  .ctrl input[type=number].val:focus { outline: none; border-color: var(--accent); }
+  .ctrl select { flex: 1; background: rgba(0,0,0,.4); border: 1px solid var(--line); border-radius: 3px;
+    color: var(--accent); font-size: 11px; padding: 2px 4px; font-family: Consolas, monospace; }
+  .btn-row { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0; }
+  .btn-row button { background: rgba(111,208,255,.10); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--text); padding: 4px 8px; font-size: 10px; cursor: pointer; flex: 1; min-width: 60px; }
+  .btn-row button:hover { background: rgba(111,208,255,.22); }
+  .btn-row button.active { background: var(--accent); color: #05080a; font-weight: 600; }
+  .btn-row button.warn { color: var(--warn); border-color: rgba(255,184,77,.4); }
+  .check { display: flex; align-items: center; gap: 6px; margin: 4px 0; cursor: pointer; font-size: 11px; }
+  .check input { margin: 0; }
+  .check label { color: var(--muted); cursor: pointer; }
+  .hint-text { font-size: 10px; color: var(--muted); line-height: 1.5; margin: 4px 0; padding: 6px 8px;
+    background: rgba(0,0,0,.25); border-radius: 4px; border-left: 2px solid var(--line); }
+  .hint-text b { color: var(--accent); }
+  .hint-text .warn { color: var(--warn); }
+  .hint-text .muz { color: var(--muz); }
+  .hint-text .noz { color: var(--noz); }
+
+  /* 炮塔/发动机/命中球分组卡片 */
+  .muz-group { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 6px 0; background: rgba(0,0,0,.15); }
+  .muz-group .muz-title { color: var(--muz); font-size: 11px; font-weight: 600; margin-bottom: 4px; }
+  .muz-group .noz-title { color: var(--noz); font-size: 11px; font-weight: 600; margin-bottom: 4px; }
+  .muz-group .grp-title { font-size: 11px; font-weight: 600; margin-bottom: 4px; }
+  .muz-group .ctrl { margin: 2px 0; }
+  .muz-group .ctrl label { width: 78px; font-size: 10px; }
+  .muz-group .sub-title { color: var(--muted); font-size: 10px; margin: 5px 0 2px; border-top: 1px dashed rgba(120,180,210,.15); padding-top: 4px; }
+
+  /* 节点列表 */
+  .node-row { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-bottom: 1px solid rgba(120,180,210,.08); font-size: 11px; }
+  .node-row input { flex-shrink: 0; }
+  .node-row .n-name { color: var(--accent); font-family: Consolas, monospace; width: 120px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .node-row .n-size { color: var(--muted); font-size: 10px; font-family: Consolas, monospace; }
+
+  /* ===== 底部状态条 ===== */
+  #status { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 11;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    padding: 4px 16px; color: var(--muted); font-size: 11px; max-width: 90vw; }
+  #status.ok { color: #6fff8a; border-color: rgba(111,255,138,.3); }
+  #status.err { color: var(--fire); border-color: rgba(255,90,77,.3); }
+
+  /* ===== 导出弹窗 ===== */
+  #export-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 30;
+    background: var(--panel-solid); border: 1px solid var(--accent); border-radius: 10px; padding: 16px;
+    max-width: 760px; width: 92%; max-height: 88vh; flex-direction: column; }
+  #export-modal.show { display: flex; }
+  #export-modal h3 { color: var(--accent); margin-bottom: 4px; font-size: 14px; }
+  #export-modal .modal-sub { color: var(--muted); font-size: 11px; margin-bottom: 10px; }
+  #export-modal .export-tabs { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+  #export-modal .export-tabs button { background: rgba(111,208,255,.08); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--muted); padding: 4px 10px; font-size: 10px; cursor: pointer; }
+  #export-modal .export-tabs button.active { background: var(--accent); color: #05080a; }
+  #export-text { flex: 1; width: 100%; min-height: 360px; background: rgba(0,0,0,.55); color: #6fff8a;
+    border: 1px solid var(--line); border-radius: 4px; padding: 10px; font-family: Consolas, monospace;
+    font-size: 11px; line-height: 1.5; resize: none; white-space: pre; overflow: auto; }
+  #export-modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+  #export-modal .modal-actions button { border-radius: 4px; padding: 6px 16px; cursor: pointer; font-size: 12px; border: 1px solid; }
+  #btn-copy-export { background: rgba(111,255,138,.15); border-color: #6fff8a; color: #6fff8a; }
+  #btn-close-export { background: rgba(255,90,77,.15); border-color: var(--fire); color: var(--fire); }
+
+  /* ===== 加载层 ===== */
+  #loader { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 40%, #122029, #05080a 70%); transition: opacity .4s; }
+  #loader.hide { opacity: 0; pointer-events: none; }
+  #loader .title { font-size: 20px; letter-spacing: 4px; color: var(--accent); margin-bottom: 18px; }
+  .bar { width: 300px; max-width: 70vw; height: 6px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #6fd0ff, #2a8fd0); transition: width .2s; }
+  #loader .pct { margin-top: 12px; font-size: 12px; color: var(--muted); }
+  #loader .err { margin-top: 16px; color: var(--fire); font-size: 12px; max-width: 80vw; text-align: center; }
+
+  /* 滚动条美化 */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: rgba(0,0,0,.2); }
+  ::-webkit-scrollbar-thumb { background: rgba(111,208,255,.3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(111,208,255,.5); }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<!-- ===== 顶栏 ===== -->
+<div id="topbar">
+  <span class="title">B-17 轰炸机调试台</span>
+  <small>|</small>
+  <button id="btn-bbox">包围盒</button>
+  <button id="btn-axis">世界轴</button>
+  <small>|</small>
+  <button class="warn" id="btn-export">📋 导出配置</button>
+</div>
+
+<!-- ===== 右侧 Tab 面板 ===== -->
+<div id="panel">
+  <div class="tabs">
+    <button data-tab="base" class="active">① 校准</button>
+    <button data-tab="turret">② 炮塔</button>
+    <button data-tab="engine">③ 发动机</button>
+    <button data-tab="hit">④ 命中球</button>
+    <button data-tab="nodes">⑤ 节点</button>
+    <button data-tab="param">⑥ 参数</button>
+  </div>
+
+  <!-- ① 校准 -->
+  <div id="tab-base" class="tab-content active">
+    <h4>朝向校准 <span class="sub">机头对齐 -Z</span></h4>
+    <div class="check"><input type="checkbox" id="auto-orient"><label for="auto-orient">autoOrient（B-17 保持关闭，用固定 yawOffset）</label></div>
+    <div class="ctrl"><label>yawOffset °</label><input type="range" id="yaw" min="-180" max="180" step="0.5" value="90"><input type="number" class="val" id="yaw-n" min="-180" max="180" step="0.5" value="90"></div>
+    <div class="ctrl"><label>pitchOffset °</label><input type="range" id="pitch" min="-30" max="30" step="0.5" value="0"><input type="number" class="val" id="pitch-n" min="-30" max="30" step="0.5" value="0"></div>
+    <div class="ctrl"><label>rollOffset °</label><input type="range" id="roll" min="-30" max="30" step="0.5" value="0"><input type="number" class="val" id="roll-n" min="-30" max="30" step="0.5" value="0"></div>
+    <div class="hint-text">B-17 模型机头原始 +X、翼展沿 Z，yawOffset=90 后机头对齐 body frame -Z。autoOrient 关闭（enemy.js 配置一致）。</div>
+
+    <h4>缩放与中心 <span class="sub">userScale = 31.6m 翼展 / 9.92 × 3.6</span></h4>
+    <div class="ctrl"><label>userScale</label><input type="range" id="scale" min="1" max="30" step="0.01" value="11.47"><input type="number" class="val" id="scale-n" min="1" max="30" step="0.01" value="11.47"></div>
+    <div class="ctrl"><label>centerOffset X</label><input type="range" id="cx" min="-30" max="30" step="0.1" value="0"><input type="number" class="val" id="cx-n" min="-30" max="30" step="0.1" value="0"></div>
+    <div class="ctrl"><label>centerOffset Y</label><input type="range" id="cy" min="-30" max="30" step="0.1" value="0"><input type="number" class="val" id="cy-n" min="-30" max="30" step="0.1" value="0"></div>
+    <div class="ctrl"><label>centerOffset Z</label><input type="range" id="cz" min="-30" max="30" step="0.1" value="0"><input type="number" class="val" id="cz-n" min="-30" max="30" step="0.1" value="0"></div>
+
+    <h4>螺旋桨 <span class="sub">helice03_FACES01~04 · 模型自带模糊盘</span></h4>
+    <div class="btn-row">
+      <button id="btn-prop-spin" class="active">桨叶旋转</button>
+      <button id="btn-blur-disc" class="active">模糊盘显隐</button>
+    </div>
+    <div class="hint-text" id="prop-info">载入中…</div>
+
+    <h4>模型尺寸信息</h4>
+    <div class="hint-text" id="size-info">载入中…</div>
+
+    <h4>恢复</h4>
+    <div class="btn-row"><button class="warn" id="btn-reset-base">恢复默认</button></div>
+  </div>
+
+  <!-- ② 炮塔（JS 程序化生成） -->
+  <div id="tab-turret" class="tab-content">
+    <h4>炮塔射界 <span class="sub">yaw 0=正后 ±90=侧 180=正前 · pitch 正=上</span></h4>
+    <div id="turret-list"></div>
+    <div class="btn-row">
+      <button id="btn-turret-cones" class="active">射界锥</button>
+      <button id="btn-turret-muzzles" class="active">枪口标记</button>
+    </div>
+    <div class="hint-text"><b>锥形 wireframe</b>=射界辅助线（顶点在枪口点，轴向=yawCenter/pitchCenter，半角=yawRange/2，长 30）。颜色：<span style="color:#ffa040">ball 橙</span> / <span style="color:#40a0ff">top 蓝</span> / <span style="color:#ff4040">tail 红</span> / <span style="color:#40ff60">cheek 绿</span>。</div>
+    <div class="btn-row"><button class="warn" id="btn-reset-turret">恢复默认</button></div>
+  </div>
+
+  <!-- ③ 发动机（JS 程序化生成） -->
+  <div id="tab-engine" class="tab-content">
+    <h4>四发动机 <span class="sub">命中点 + 发烟点 · body frame</span></h4>
+    <div id="engine-list"></div>
+    <div class="btn-row">
+      <button id="btn-engine-markers" class="active">发动机标记</button>
+    </div>
+    <div class="hint-text"><span class="muz">红球</span>=命中点（半径 7 线框球）；<b>灰球</b>=发烟点。</div>
+    <div class="btn-row"><button class="warn" id="btn-reset-engine">恢复默认</button></div>
+  </div>
+
+  <!-- ④ 命中球（JS 程序化生成） -->
+  <div id="tab-hit" class="tab-content">
+    <h4>命中球 <span class="sub">大机体多球近似 · body frame</span></h4>
+    <div id="hit-list"></div>
+    <div class="btn-row">
+      <button id="btn-hit-markers" class="active">命中球标记</button>
+    </div>
+    <div class="hint-text"><b>蓝球</b>=机体命中球；<span class="muz">橙球</span>=发动机命中球（engine 索引非空）。改 engine 下拉自动换色。</div>
+    <div class="btn-row"><button class="warn" id="btn-reset-hit">恢复默认</button></div>
+  </div>
+
+  <!-- ⑤ 节点 -->
+  <div id="tab-nodes" class="tab-content">
+    <h4>模型节点 <span class="sub">勾选=显示 · 取消=隐藏</span></h4>
+    <div class="hint-text">用途：人工识别炮塔/起落架/桨叶/模糊盘节点。隐藏集合在导出时写入 hideGearNodes（初值：rueda01_FACES02 / Object35 / Object03 / Object02 起落架轮组）。</div>
+    <div id="node-list"><div class="hint-text">载入中…</div></div>
+    <div class="btn-row">
+      <button id="btn-nodes-all">全部显示</button>
+      <button id="btn-nodes-none">全部隐藏</button>
+    </div>
+  </div>
+
+  <!-- ⑥ 参数 -->
+  <div id="tab-param" class="tab-content">
+    <h4>生存与速度 <span class="sub">bomberStream 顶层字段</span></h4>
+    <div class="ctrl"><label>hp</label><input type="range" id="p-hp" min="100" max="2000" step="10" value="450"><input type="number" class="val" id="p-hp-n" min="100" max="2000" step="10" value="450"></div>
+    <div class="ctrl"><label>damageThreshold</label><input type="range" id="p-dmg" min="0" max="1" step="0.01" value="0.55"><input type="number" class="val" id="p-dmg-n" min="0" max="1" step="0.01" value="0.55"></div>
+    <div class="ctrl"><label>speed</label><input type="range" id="p-spd" min="20" max="200" step="1" value="87"><input type="number" class="val" id="p-spd-n" min="20" max="200" step="1" value="87"></div>
+
+    <h4>炮塔弹丸 <span class="sub">全炮塔共享</span></h4>
+    <div class="ctrl"><label>bulletSpeed</label><input type="range" id="p-bspd" min="100" max="1500" step="10" value="650"><input type="number" class="val" id="p-bspd-n" min="100" max="1500" step="10" value="650"></div>
+    <div class="ctrl"><label>turretDamage min</label><input type="range" id="p-tdmin" min="0" max="20" step="1" value="2"><input type="number" class="val" id="p-tdmin-n" min="0" max="20" step="1" value="2"></div>
+    <div class="ctrl"><label>turretDamage max</label><input type="range" id="p-tdmax" min="0" max="20" step="1" value="4"><input type="number" class="val" id="p-tdmax-n" min="0" max="20" step="1" value="4"></div>
+
+    <div class="hint-text"><span class="warn">注</span>：静态场景无 AI 行为，调好导出后在游戏内测试。hp=高 HP 池；damageThreshold=损失比例达到后脱离编队返航。</div>
+    <div class="btn-row"><button class="warn" id="btn-reset-param">恢复默认</button></div>
+  </div>
+</div>
+
+<!-- ===== 底部状态条 ===== -->
+<div id="status">载入中…</div>
+
+<!-- ===== 导出弹窗 ===== -->
+<div id="export-modal">
+  <h3>导出配置</h3>
+  <div class="modal-sub">按部分单独导出。校准片段 → js/enemy.js MODEL_CONFIGS；其余 → js/config/levels/level_04_berlin.js bomberStream。默认导出全量 bomberStream。</div>
+  <div class="export-tabs">
+    <button data-export="all" class="active">全量 bomberStream</button>
+    <button data-export="calib">① 校准</button>
+    <button data-export="turret">② 炮塔+枪口</button>
+    <button data-export="engine">③ 发动机</button>
+    <button data-export="hit">④ 命中球</button>
+    <button data-export="nodes">⑤ 隐藏节点</button>
+    <button data-export="param">⑥ 参数</button>
+  </div>
+  <textarea id="export-text" readonly></textarea>
+  <div class="modal-actions">
+    <button id="btn-copy-export">复制</button>
+    <button id="btn-close-export">关闭</button>
+  </div>
+</div>
+
+<!-- ===== 加载层 ===== -->
+<div id="loader">
+  <div class="title">B-17 TUNER · Flying Fortress</div>
+  <div class="bar"><i id="loader-fill"></i></div>
+  <div class="pct" id="loader-pct">0%</div>
+  <div class="err" id="loader-err"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/node_modules/three/build/three.module.js",
+    "three/addons/": "/node_modules/three/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+// ====================================================================
+// 默认值（enemy.js MODEL_CONFIGS['/model/b17.glb'] + level_04_berlin.js bomberStream）
+// ====================================================================
+const TURRET_COLORS = { ball: 0xffa040, top: 0x40a0ff, tail: 0xff4040, cheek: 0x40ff60 };
+const TURRET_LABELS = { ball: 'ball 球塔（机腹）', top: 'top 顶炮（机背）', tail: 'tail 尾炮', cheek: 'cheek 颊炮（机头）' };
+const ENGINE_NAMES = ['右内', '左内', '右外', '左外'];
+
+const DEFAULTS = {
+  // ① 校准（enemy.js MODEL_CONFIGS：机头原始 +X，yaw 90 对齐 -Z；真实翼展 31.6m / 9.92 × 3.6 ≈ 11.47）
+  base: { autoOrient: false, yaw: 90.0, pitch: 0, roll: 0, scale: 11.47, cx: 0, cy: 0, cz: 0 },
+  propNodes: ['helice03_FACES01', 'helice03_FACES02', 'helice03_FACES03', 'helice03_FACES04'],
+  propSpinSpeed: 160,
+  propOpacity: 0.30,
+  // 起落架隐藏节点（初值，节点页可修正）
+  hiddenNodes: ['rueda01_FACES02', 'Object35', 'Object03', 'Object02'],
+  // ② 炮塔 + 枪口（level_04_berlin.js bomberStream.turrets/muzzles 原值照抄）
+  muzzles: [
+    { pos: [0, -4.7, 2.8] },   // 0-1 球塔（机腹）
+    { pos: [0, -4.7, 2.8] },
+    { pos: [0, -0.5, 3.2] },   // 2-3 顶炮（机背）
+    { pos: [0, -0.5, 3.2] },
+    { pos: [0, -2.5, 38.5] },  // 4-5 尾炮
+    { pos: [0, -2.5, 38.5] },
+    { pos: [0, -3.0, -35.0] }, // 6-7 颊炮（机头）
+    { pos: [0, -3.0, -35.0] },
+  ],
+  turrets: [
+    { name: 'ball',  muzzles: [0, 1], yawCenter: 0,   yawRange: 360, pitchCenter: -40, pitchRange: 50,
+      range: 900, burst: [1.0, 1.8], cd: [2.5, 4.0], spreadDeg: 1.5, fireRate: 0.13 },
+    { name: 'top',   muzzles: [2, 3], yawCenter: 0,   yawRange: 140, pitchCenter: 30,  pitchRange: 50,
+      range: 900, burst: [1.0, 1.6], cd: [2.5, 4.0], spreadDeg: 1.5, fireRate: 0.13 },
+    { name: 'tail',  muzzles: [4, 5], yawCenter: 0,   yawRange: 80,  pitchCenter: 0,   pitchRange: 60,
+      range: 950, burst: [1.2, 2.0], cd: [2.0, 3.5], spreadDeg: 1.2, fireRate: 0.12 },
+    { name: 'cheek', muzzles: [6, 7], yawCenter: 180, yawRange: 120, pitchCenter: -10, pitchRange: 40,
+      range: 700, burst: [0.8, 1.4], cd: [3.0, 5.0], spreadDeg: 1.8, fireRate: 0.14 },
+  ],
+  // ③ 发动机（level_04_berlin.js bomberStream.engines 原值照抄）
+  engines: [
+    { hitOffset: [9.6, -1.9, -25],  smokeOffset: [9.6, -1.7, -22] },   // 右内
+    { hitOffset: [-9.6, -1.9, -25], smokeOffset: [-9.6, -1.7, -22] },  // 左内
+    { hitOffset: [21.1, -1.9, -25], smokeOffset: [21.1, -1.7, -22] },  // 右外
+    { hitOffset: [-21.1, -1.9, -25], smokeOffset: [-21.1, -1.7, -22] },// 左外
+  ],
+  // ④ 命中球（level_04_berlin.js bomberStream.hitSpheres 原值照抄）
+  hitSpheres: [
+    { offset: [0, -1, 0],      radius: 16, engine: null },  // 躯干
+    { offset: [9.6, -1.9, -25],  radius: 7, engine: 0 },    // 右内发
+    { offset: [-9.6, -1.9, -25], radius: 7, engine: 1 },    // 左内发
+    { offset: [21.1, -1.9, -25], radius: 7, engine: 2 },    // 右外发
+    { offset: [-21.1, -1.9, -25], radius: 7, engine: 3 },   // 左外发
+    { offset: [40, -1, 0],     radius: 10, engine: null },  // 右翼尖
+    { offset: [-40, -1, 0],    radius: 10, engine: null },  // 左翼尖
+    { offset: [0, 0, 30],      radius: 9,  engine: null },  // 尾部
+  ],
+  // ⑥ 参数（bomberStream 顶层）
+  param: { hp: 450, damageThreshold: 0.55, speed: 87, bulletSpeed: 650, turretDamageMin: 2, turretDamageMax: 4 },
+};
+
+// 当前可变状态（深拷贝默认值）
+const state = {
+  base: { ...DEFAULTS.base },
+  muzzles: DEFAULTS.muzzles.map(m => ({ pos: [...m.pos] })),
+  turrets: DEFAULTS.turrets.map(t => ({ ...t, muzzles: [...t.muzzles], burst: [...t.burst], cd: [...t.cd] })),
+  engines: DEFAULTS.engines.map(e => ({ hitOffset: [...e.hitOffset], smokeOffset: [...e.smokeOffset] })),
+  hitSpheres: DEFAULTS.hitSpheres.map(h => ({ offset: [...h.offset], radius: h.radius, engine: h.engine })),
+  param: { ...DEFAULTS.param },
+  hiddenNodes: new Set(DEFAULTS.hiddenNodes),
+  propSpin: true,
+  blurDisc: true,
+};
+
+// ====================================================================
+// 三大场景对象
+// ====================================================================
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.5, 50000);
+camera.position.set(0, 80, 120);
+
+// 天空（渐变球，同 tune.js）
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(20000, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, toneMapped: false, depthWrite: false,
+    uniforms: {
+      topColor: { value: new THREE.Color(0x2a6fb6) },
+      midColor: { value: new THREE.Color(0x8fb8d8) },
+      botColor: { value: new THREE.Color(0x4a5530) },
+    },
+    vertexShader: `varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+    fragmentShader: `varying vec3 vP; uniform vec3 topColor; uniform vec3 midColor; uniform vec3 botColor;
+      void main(){ float h=normalize(vP).y; vec3 c=h>0.0?mix(midColor,topColor,smoothstep(0.0,0.55,h)):mix(midColor,botColor,smoothstep(0.0,-0.25,h)); gl_FragColor=vec4(c,1.0);}`,
+  })
+);
+scene.add(sky);
+
+// 光照（同 tune.js）
+scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x4a5d3a, 0.9));
+const sun = new THREE.DirectionalLight(0xfff1d0, 2.8);
+sun.position.set(40, 60, 30); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -80; sun.shadow.camera.right = 80;
+sun.shadow.camera.top = 80; sun.shadow.camera.bottom = -80;
+sun.shadow.camera.far = 300; sun.shadow.bias = -0.0004;
+scene.add(sun); scene.add(sun.target);
+scene.fog = new THREE.FogExp2(0xc4d2dc, 0.00020);
+
+// 地面网格（同 tune.js）
+const grid = new THREE.GridHelper(2400, 120, 0x9fd6ff, 0x3a5a72);
+grid.material.opacity = 0.32; grid.material.transparent = true; grid.position.y = 0.3;
+scene.add(grid);
+
+// 世界坐标轴
+const worldAxis = new THREE.AxesHelper(8);
+scene.add(worldAxis);
+
+// ====================================================================
+// 飞机：root -> modelYaw -> model（严格复刻 aircraft.js 结构）
+// ====================================================================
+const root = new THREE.Group();
+const modelYaw = new THREE.Group();
+root.add(modelYaw);
+scene.add(root);
+
+let model = null;
+let baseScale = 1;          // _normalize 算出的归一化缩放
+let yawOffset = 0;          // _autoOrient 算出的偏航（度）
+let bboxHelper = null;
+
+// 辅助对象注册
+const turretCones = [];     // 每塔一个锥形 wireframe
+const turretMuzzleMarkers = []; // 8 个枪口球
+const engineHitMarkers = [], engineSmokeMarkers = [];
+const hitSphereMarkers = [];
+const propMeshes = [];      // 桨叶节点
+const blurDiscMeshes = [];  // 模型自带模糊盘节点
+
+// ====================================================================
+// 炮塔辅助线：锥形 wireframe（顶点在枪口点，轴向=yawCenter/pitchCenter）
+// ====================================================================
+const CONE_LEN = 30;
+/** 射界方向：yaw 0=正后(+Z) 180=正前(-Z)；pitch 正=上 */
+function turretDir(t) {
+  const yaw = THREE.MathUtils.degToRad(t.yawCenter);
+  const pitch = THREE.MathUtils.degToRad(t.pitchCenter);
+  return new THREE.Vector3(
+    Math.sin(yaw) * Math.cos(pitch),
+    Math.sin(pitch),
+    Math.cos(yaw) * Math.cos(pitch)
+  ).normalize();
+}
+/** 枪口点（两枪口均值） */
+function turretApex(t) {
+  const a = state.muzzles[t.muzzles[0]].pos, b = state.muzzles[t.muzzles[1]].pos;
+  return new THREE.Vector3((a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2);
+}
+
+const _Y_NEG = new THREE.Vector3(0, -1, 0);
+function buildTurretHelpers() {
+  turretCones.forEach(c => { root.remove(c); c.geometry.dispose(); });
+  turretMuzzleMarkers.forEach(m => root.remove(m));
+  turretCones.length = 0; turretMuzzleMarkers.length = 0;
+  state.turrets.forEach((t) => {
+    const color = TURRET_COLORS[t.name];
+    // 锥：半角 = yawRange/2（360 全向时钳制到 80° 避免无穷半径）
+    const halfAngle = Math.min(t.yawRange / 2, 80);
+    const r = Math.tan(THREE.MathUtils.degToRad(Math.max(halfAngle, 1))) * CONE_LEN;
+    const geo = new THREE.ConeGeometry(r, CONE_LEN, 20, 1, true);
+    geo.translate(0, -CONE_LEN / 2, 0); // 顶点移到原点，锥体沿 -Y 延伸
+    const cone = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      color, wireframe: true, transparent: true, opacity: 0.55, depthTest: false,
+    }));
+    cone.renderOrder = 9;
+    root.add(cone); turretCones.push(cone);
+    // 枪口球 ×2
+    t.muzzles.forEach((mi) => {
+      const ball = new THREE.Mesh(
+        new THREE.SphereGeometry(0.8, 12, 12),
+        new THREE.MeshBasicMaterial({ color, depthTest: false })
+      );
+      ball.renderOrder = 10; root.add(ball); turretMuzzleMarkers.push({ mesh: ball, muzzleIdx: mi });
+    });
+  });
+  updateTurretHelpers();
+}
+
+const _dirTmp = new THREE.Vector3();
+function updateTurretHelpers() {
+  state.turrets.forEach((t, i) => {
+    const cone = turretCones[i];
+    cone.position.copy(turretApex(t));
+    _dirTmp.copy(turretDir(t));
+    cone.quaternion.setFromUnitVectors(_Y_NEG, _dirTmp);
+    // 半角随 yawRange 变化时重建几何（半径变化）
+    const halfAngle = Math.min(t.yawRange / 2, 80);
+    const r = Math.tan(THREE.MathUtils.degToRad(Math.max(halfAngle, 1))) * CONE_LEN;
+    cone.geometry.dispose();
+    cone.geometry = new THREE.ConeGeometry(r, CONE_LEN, 20, 1, true);
+    cone.geometry.translate(0, -CONE_LEN / 2, 0);
+  });
+  turretMuzzleMarkers.forEach(({ mesh, muzzleIdx }) => {
+    const p = state.muzzles[muzzleIdx].pos;
+    mesh.position.set(p[0], p[1], p[2]);
+  });
+}
+
+// ====================================================================
+// 发动机辅助：命中点红球（半径 7 线框）+ 发烟点灰球
+// ====================================================================
+function buildEngineHelpers() {
+  engineHitMarkers.forEach(m => { root.remove(m); });
+  engineSmokeMarkers.forEach(m => { root.remove(m); });
+  engineHitMarkers.length = 0; engineSmokeMarkers.length = 0;
+  state.engines.forEach(() => {
+    const hit = new THREE.Mesh(
+      new THREE.SphereGeometry(7, 14, 10),
+      new THREE.MeshBasicMaterial({ color: 0xff5a4d, wireframe: true, transparent: true, opacity: 0.8, depthTest: false })
+    );
+    hit.renderOrder = 9; root.add(hit); engineHitMarkers.push(hit);
+    const smoke = new THREE.Mesh(
+      new THREE.SphereGeometry(1.5, 10, 8),
+      new THREE.MeshBasicMaterial({ color: 0x9aa4ac, transparent: true, opacity: 0.9, depthTest: false })
+    );
+    smoke.renderOrder = 10; root.add(smoke); engineSmokeMarkers.push(smoke);
+  });
+  updateEngineHelpers();
+}
+function updateEngineHelpers() {
+  state.engines.forEach((e, i) => {
+    engineHitMarkers[i].position.set(e.hitOffset[0], e.hitOffset[1], e.hitOffset[2]);
+    engineSmokeMarkers[i].position.set(e.smokeOffset[0], e.smokeOffset[1], e.smokeOffset[2]);
+  });
+}
+
+// ====================================================================
+// 命中球辅助：线框球（机体蓝 / 发动机橙）
+// ====================================================================
+function buildHitHelpers() {
+  hitSphereMarkers.forEach(m => { root.remove(m); m.geometry.dispose(); });
+  hitSphereMarkers.length = 0;
+  state.hitSpheres.forEach((h) => {
+    const color = (h.engine === null || h.engine === undefined) ? 0x40a0ff : 0xffa040;
+    const s = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 16, 12),   // 单位球，实际半径由 scale 控制（radius 滑杆实时生效）
+      new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.6, depthTest: false })
+    );
+    s.renderOrder = 9; root.add(s); hitSphereMarkers.push(s);
+  });
+  updateHitHelpers();
+}
+function updateHitHelpers() {
+  state.hitSpheres.forEach((h, i) => {
+    const s = hitSphereMarkers[i];
+    s.position.set(h.offset[0], h.offset[1], h.offset[2]);
+    s.scale.setScalar(h.radius);
+    const isEngine = (h.engine !== null && h.engine !== undefined);
+    s.material.color.setHex(isEngine ? 0xffa040 : 0x40a0ff);
+  });
+}
+
+// ====================================================================
+// 渲染管线：复刻 aircraft.js _normalize / _autoOrient / _applyCalibration
+// ====================================================================
+
+/** 缩放到目标尺寸 + 居中（含 centerOffset 微调）—— 复刻 _normalize() */
+function normalize() {
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const longest = Math.max(size.x, size.y, size.z) || 1;
+  const target = 9; // 目标最长边 = 9 单位（约 9 米）
+  baseScale = target / longest;
+  model.scale.setScalar(baseScale);
+  model.position.copy(center).multiplyScalar(-baseScale);
+  // centerOffset（body frame 世界单位，缩放后）
+  model.position.x += state.base.cx || 0;
+  model.position.y += state.base.cy || 0;
+  model.position.z += state.base.cz || 0;
+}
+
+/** 自动朝向校准 —— 复刻 _autoOrient()；B-17 保持关闭 */
+function autoOrient() {
+  if (!state.base.autoOrient) { applyCalibration(); return; }
+  yawOffset = state.base.yaw;
+  applyCalibration();
+}
+
+/** 应用校准：modelYaw 旋转 + model 缩放 —— 复刻 _applyCalibration() */
+function applyCalibration() {
+  modelYaw.rotation.set(
+    THREE.MathUtils.degToRad(state.base.pitch),
+    THREE.MathUtils.degToRad(state.base.autoOrient ? yawOffset : state.base.yaw),
+    THREE.MathUtils.degToRad(state.base.roll),
+    'YXZ'
+  );
+  model.scale.setScalar(baseScale * state.base.scale);
+}
+
+// ====================================================================
+// 模型加载（复刻 tune.js + aircraft.js 模板后处理）
+// ====================================================================
+async function loadModel() {
+  const loader = new GLTFLoader();
+  const draco = new DRACOLoader();
+  draco.setDecoderPath('/node_modules/three/examples/jsm/libs/draco/');
+  loader.setDRACOLoader(draco);
+  loader.setMeshoptDecoder(MeshoptDecoder);
+
+  const gltf = await loader.loadAsync('/model/b17.glb', (e) => {
+    if (e.lengthComputable) {
+      const p = (e.loaded / e.total) * 100;
+      document.getElementById('loader-fill').style.width = p + '%';
+      document.getElementById('loader-pct').textContent = p.toFixed(0) + '%';
+    }
+  });
+  model = gltf.scene;
+  // 模板后处理（同 aircraft.js load 内）：阴影 + roughness 提亮
+  model.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = true; o.receiveShadow = true;
+      if (o.material) {
+        (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+          if (m.roughness !== undefined) m.roughness = Math.min(1, m.roughness + 0.05);
+        });
+      }
+    }
+  });
+
+  // 渲染管线：normalize -> autoOrient（内含 applyCalibration）
+  normalize();
+  modelYaw.add(model);
+  autoOrient();
+
+  // 节点可见性：按 state.hiddenNodes 隐藏（默认起落架轮组）
+  // 名字匹配兼容 GLTFLoader 后缀：精确名 / '名-…'（-FACES_1 等多材质拆分）/ '命名空间:名'
+  const nameMatch = (objName, cfgName) =>
+    objName === cfgName || objName.startsWith(cfgName + '-') || objName.endsWith(':' + cfgName);
+  model.traverse((o) => {
+    if (!o.name) return;
+    for (const hn of state.hiddenNodes) { if (nameMatch(o.name, hn)) { o.visible = false; break; } }
+  });
+
+  // 桨叶节点 + 模糊盘节点（Cylinder15~22 系列）
+  model.traverse((o) => {
+    if (!o.isMesh || !o.name) return;
+    if (DEFAULTS.propNodes.some(pn => nameMatch(o.name, pn))) propMeshes.push(o);
+    if (/^Cylinder(1[5-9]|2[0-2])(-|$|:)/.test(o.name)) blurDiscMeshes.push(o);
+  });
+  document.getElementById('prop-info').innerHTML =
+    `桨叶节点：<b>${propMeshes.map(m => m.name).join(', ') || '未找到'}</b><br>` +
+    `模糊盘节点（Cylinder15~22 系列）：<b>${blurDiscMeshes.map(m => m.name).join(', ') || '未找到'}</b><br>` +
+    `propSpinSpeed=${DEFAULTS.propSpinSpeed} · propOpacity=${DEFAULTS.propOpacity}（game 内生效，此处仅预览旋转/显隐）`;
+
+  // 辅助标记
+  buildTurretHelpers();
+  buildEngineHelpers();
+  buildHitHelpers();
+
+  // 节点列表
+  buildNodeList();
+
+  // 摆位
+  root.position.set(0, 60, 0);
+  updateSizeInfo();
+  setStatus('就绪 · 4 桨 / 4 炮塔 / 4 发动机 / 8 命中球 / 节点页可识别部件', 'ok');
+  setTimeout(() => document.getElementById('loader').classList.add('hide'), 300);
+}
+
+/** 重新应用校准（用户改参数后调用，不重新加载模型） */
+function reapplyCalibration() {
+  if (!model) return;
+  normalize();
+  autoOrient();
+  updateSizeInfo();
+}
+
+function updateSizeInfo() {
+  if (!model) return;
+  root.updateWorldMatrix(true, true); // setFromObject 不更新父链矩阵，先强制刷新
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const el = document.getElementById('size-info');
+  if (el) {
+    el.innerHTML = `包围盒（缩放后）：<b>${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)}</b><br>` +
+      `baseScale=${baseScale.toFixed(3)} · userScale=${state.base.scale.toFixed(2)} · 最终=${(baseScale*state.base.scale).toFixed(3)}<br>` +
+      `yawOffset=${(state.base.autoOrient ? yawOffset : state.base.yaw).toFixed(1)}°`;
+  }
+}
+
+// ====================================================================
+// 节点列表（识别/隐藏模型节点）
+// ====================================================================
+function buildNodeList() {
+  const listEl = document.getElementById('node-list');
+  listEl.innerHTML = '';
+  if (!model) return;
+  const rows = [];
+  model.traverse((o) => {
+    if (!o.isMesh || !o.name) return;
+    rows.push(o);
+  });
+  rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  for (const o of rows) {
+    const box = new THREE.Box3().setFromObject(o);
+    const s = box.getSize(new THREE.Vector3());
+    const row = document.createElement('div');
+    row.className = 'node-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = o.visible;
+    cb.addEventListener('change', () => {
+      o.visible = cb.checked;
+      if (cb.checked) state.hiddenNodes.delete(o.name);
+      else state.hiddenNodes.add(o.name);
+    });
+    row.appendChild(cb);
+    const nm = document.createElement('span');
+    nm.className = 'n-name'; nm.textContent = o.name; nm.title = o.name;
+    row.appendChild(nm);
+    const sz = document.createElement('span');
+    sz.className = 'n-size';
+    sz.textContent = `${s.x.toFixed(1)}×${s.y.toFixed(1)}×${s.z.toFixed(1)}`;
+    row.appendChild(sz);
+    listEl.appendChild(row);
+  }
+}
+
+// ====================================================================
+// 相机：追尾 + 左键自由观察 + 滚轮缩放（复刻 tune.js）
+// ====================================================================
+const chase = { x: 0, y: 18, z: 70 };
+const freeView = { yaw: 0, pitch: 0, dist: 1, dragging: false, lx: 0, ly: 0 };
+
+addEventListener('contextmenu', (e) => e.preventDefault());
+addEventListener('mousedown', (e) => {
+  if (e.button === 0 && e.target.tagName === 'CANVAS') { freeView.dragging = true; freeView.lx = e.clientX; freeView.ly = e.clientY; e.preventDefault(); }
+});
+addEventListener('mouseup', (e) => { if (e.button === 0) freeView.dragging = false; });
+addEventListener('mousemove', (e) => {
+  if (!freeView.dragging) return;
+  const dx = (e.clientX - freeView.lx) * 0.005;
+  const dy = (e.clientY - freeView.ly) * 0.005;
+  freeView.yaw -= dx; freeView.pitch -= dy;
+  freeView.pitch = Math.max(-1.4, Math.min(1.4, freeView.pitch));
+  freeView.lx = e.clientX; freeView.ly = e.clientY;
+});
+addEventListener('wheel', (e) => {
+  freeView.dist *= e.deltaY > 0 ? 1.08 : 0.92;
+  freeView.dist = Math.max(0.2, Math.min(6, freeView.dist));
+}, { passive: true });
+
+function getForward() {
+  return new THREE.Vector3(0, 0, -1).applyQuaternion(root.quaternion);
+}
+
+const _fwd = new THREE.Vector3();
+const _lookAt = new THREE.Vector3();
+const _obs = new THREE.Quaternion();
+function updateCamera(dt) {
+  _obs.setFromEuler(new THREE.Euler(freeView.pitch, freeView.yaw, 0, 'YXZ'));
+  const baseOff = new THREE.Vector3(chase.x, chase.y, chase.z).multiplyScalar(freeView.dist);
+  const off = baseOff.applyQuaternion(_obs).applyQuaternion(root.quaternion).add(root.position);
+  camera.position.lerp(off, 1 - Math.exp(-dt * 6));
+  _fwd.copy(getForward()).multiplyScalar(8).add(root.position);
+  camera.lookAt(_fwd);
+}
+
+// ====================================================================
+// 准星（同 tune.html 样式，固定屏幕中心）
+// ====================================================================
+const crossEl = document.createElement('div');
+crossEl.id = 'crosshair';
+crossEl.innerHTML = '<div class="ring"></div><div class="dot"></div>';
+crossEl.style.cssText = 'position:fixed;top:50%;left:50%;width:56px;height:56px;transform:translate(-50%,-50%);opacity:.95;pointer-events:none;z-index:5;';
+const ringStyle = document.createElement('style');
+ringStyle.textContent = `
+#crosshair .ring{position:absolute;inset:0;border:1.5px solid rgba(255,90,77,.85);border-radius:50%;box-shadow:0 0 8px rgba(255,90,77,.5);}
+#crosshair .dot{position:absolute;top:50%;left:50%;width:3px;height:3px;border-radius:50%;background:#ff5a4d;transform:translate(-50%,-50%);box-shadow:0 0 6px rgba(255,90,77,.9);}
+#crosshair::before,#crosshair::after{content:"";position:absolute;background:rgba(255,90,77,.85);}
+#crosshair::before{left:50%;top:18%;width:1.5px;height:26%;transform:translateX(-50%);}
+#crosshair::after{top:50%;left:18%;height:1.5px;width:26%;transform:translateY(-50%);}`;
+document.head.appendChild(ringStyle);
+document.body.appendChild(crossEl);
+
+// ====================================================================
+// 主循环
+// ====================================================================
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  // 桨叶旋转（rotateZ 每帧，propSpinSpeed 角速度）
+  if (state.propSpin) {
+    const w = DEFAULTS.propSpinSpeed * dt;
+    propMeshes.forEach(m => m.rotateZ(w));
+  }
+  updateCamera(dt);
+  renderer.render(scene, camera);
+}
+
+// ====================================================================
+// UI 绑定
+// ====================================================================
+const $ = (id) => document.getElementById(id);
+
+/** 双向绑定 range + number，改值回调 */
+function bindSlider(rangeId, numId, onChange) {
+  const r = $(rangeId), n = $(numId);
+  const apply = (val) => {
+    val = +val; if (Number.isNaN(val)) return;
+    r.value = val; n.value = val; onChange(val);
+  };
+  r.addEventListener('input', (e) => apply(e.target.value));
+  n.addEventListener('input', (e) => apply(e.target.value));
+  n.addEventListener('change', (e) => apply(e.target.value));
+}
+
+/** 程序化生成一组滑杆行（range + number 双向绑定） */
+function makeCtrl(parent, label, min, max, step, value, onChange) {
+  const row = document.createElement('div');
+  row.className = 'ctrl';
+  const lb = document.createElement('label');
+  lb.textContent = label;
+  const r = document.createElement('input');
+  r.type = 'range'; r.min = min; r.max = max; r.step = step; r.value = value;
+  const n = document.createElement('input');
+  n.type = 'number'; n.className = 'val'; n.min = min; n.max = max; n.step = step; n.value = value;
+  const apply = (val) => {
+    val = +val; if (Number.isNaN(val)) return;
+    r.value = val; n.value = val; onChange(val);
+  };
+  r.addEventListener('input', (e) => apply(e.target.value));
+  n.addEventListener('input', (e) => apply(e.target.value));
+  n.addEventListener('change', (e) => apply(e.target.value));
+  row.appendChild(lb); row.appendChild(r); row.appendChild(n);
+  parent.appendChild(row);
+  return { row, r, n, sync: (v) => { r.value = v; n.value = v; } };
+}
+
+// ----- ① 模型校准 -----
+$('auto-orient').addEventListener('change', (e) => {
+  state.base.autoOrient = e.target.checked; reapplyCalibration();
+});
+bindSlider('yaw', 'yaw-n', (v) => { state.base.yaw = v; if (!state.base.autoOrient) reapplyCalibration(); });
+bindSlider('pitch', 'pitch-n', (v) => { state.base.pitch = v; reapplyCalibration(); });
+bindSlider('roll', 'roll-n', (v) => { state.base.roll = v; reapplyCalibration(); });
+bindSlider('scale', 'scale-n', (v) => { state.base.scale = v; reapplyCalibration(); });
+bindSlider('cx', 'cx-n', (v) => { state.base.cx = v; reapplyCalibration(); });
+bindSlider('cy', 'cy-n', (v) => { state.base.cy = v; reapplyCalibration(); });
+bindSlider('cz', 'cz-n', (v) => { state.base.cz = v; reapplyCalibration(); });
+$('btn-reset-base').addEventListener('click', () => {
+  Object.assign(state.base, DEFAULTS.base); syncBaseUI(); reapplyCalibration();
+});
+function syncBaseUI() {
+  $('auto-orient').checked = state.base.autoOrient;
+  [['yaw','yaw-n','yaw'],['pitch','pitch-n','pitch'],['roll','roll-n','roll'],['scale','scale-n','scale'],
+   ['cx','cx-n','cx'],['cy','cy-n','cy'],['cz','cz-n','cz']].forEach(([r,n,k]) => {
+    $(r).value = state.base[k]; $(n).value = state.base[k];
+  });
+}
+
+// 桨叶旋转 / 模糊盘显隐
+$('btn-prop-spin').addEventListener('click', () => {
+  const btn = $('btn-prop-spin'); btn.classList.toggle('active');
+  state.propSpin = btn.classList.contains('active');
+});
+$('btn-blur-disc').addEventListener('click', () => {
+  const btn = $('btn-blur-disc'); btn.classList.toggle('active');
+  state.blurDisc = btn.classList.contains('active');
+  blurDiscMeshes.forEach(m => { m.visible = state.blurDisc; });
+});
+
+// ----- ② 炮塔（程序化生成） -----
+const turretUIs = [];
+function buildTurretTab() {
+  const host = $('turret-list');
+  host.innerHTML = '';
+  turretUIs.length = 0;
+  const XYZ_RANGES = { x: [-60, 60], y: [-15, 10], z: [-45, 45] };
+  state.turrets.forEach((t, ti) => {
+    const colorCss = '#' + TURRET_COLORS[t.name].toString(16).padStart(6, '0');
+    const grp = document.createElement('div');
+    grp.className = 'muz-group';
+    const title = document.createElement('div');
+    title.className = 'grp-title';
+    title.style.color = colorCss;
+    title.textContent = `${t.name} · ${TURRET_LABELS[t.name]}`;
+    grp.appendChild(title);
+
+    const ui = { ctrls: [] };
+
+    // 枪口点 ×2
+    t.muzzles.forEach((mi, k) => {
+      const st = document.createElement('div');
+      st.className = 'sub-title';
+      st.textContent = `枪口点 ${mi}（muzzles[${mi}]）`;
+      grp.appendChild(st);
+      ['x','y','z'].forEach((axis, ai) => {
+        const [mn, mx] = XYZ_RANGES[axis];
+        const c = makeCtrl(grp, axis.toUpperCase(), mn, mx, 0.1, state.muzzles[mi].pos[ai], (v) => {
+          state.muzzles[mi].pos[ai] = v; updateTurretHelpers();
+        });
+        ui.ctrls.push({ c, get: () => state.muzzles[mi].pos[ai] });
+      });
+    });
+
+    // 射界
+    const st2 = document.createElement('div');
+    st2.className = 'sub-title';
+    st2.textContent = '射界（yaw 0=正后 180=正前 · pitch 正=上）';
+    grp.appendChild(st2);
+    const arcDefs = [
+      ['yawCenter', -180, 180, 1], ['yawRange', 0, 360, 1],
+      ['pitchCenter', -90, 90, 1], ['pitchRange', 0, 180, 1],
+    ];
+    arcDefs.forEach(([key, mn, mx, step]) => {
+      const c = makeCtrl(grp, key, mn, mx, step, t[key], (v) => { t[key] = v; updateTurretHelpers(); });
+      ui.ctrls.push({ c, get: () => t[key] });
+    });
+
+    // 参数
+    const st3 = document.createElement('div');
+    st3.className = 'sub-title';
+    st3.textContent = '参数';
+    grp.appendChild(st3);
+    const paramDefs = [
+      ['range', 'range', 100, 2000, 10],
+      ['burst 最小', 'burst0', 0.1, 5, 0.1], ['burst 最大', 'burst1', 0.1, 5, 0.1],
+      ['cd 最小', 'cd0', 0.1, 10, 0.1], ['cd 最大', 'cd1', 0.1, 10, 0.1],
+      ['spreadDeg', 'spreadDeg', 0, 10, 0.1], ['fireRate', 'fireRate', 0.01, 0.5, 0.01],
+    ];
+    paramDefs.forEach(([label, key, mn, mx, step]) => {
+      const get = () => key === 'burst0' ? t.burst[0] : key === 'burst1' ? t.burst[1]
+        : key === 'cd0' ? t.cd[0] : key === 'cd1' ? t.cd[1] : t[key];
+      const c = makeCtrl(grp, label, mn, mx, step, get(), (v) => {
+        if (key === 'burst0') t.burst[0] = v;
+        else if (key === 'burst1') t.burst[1] = v;
+        else if (key === 'cd0') t.cd[0] = v;
+        else if (key === 'cd1') t.cd[1] = v;
+        else t[key] = v;
+      });
+      ui.ctrls.push({ c, get });
+    });
+
+    host.appendChild(grp);
+    turretUIs.push(ui);
+  });
+}
+function syncTurretUI() {
+  turretUIs.forEach((ui) => ui.ctrls.forEach(({ c, get }) => c.sync(get())));
+}
+$('btn-turret-cones').addEventListener('click', () => {
+  const btn = $('btn-turret-cones'); btn.classList.toggle('active');
+  turretCones.forEach(c => (c.visible = btn.classList.contains('active')));
+});
+$('btn-turret-muzzles').addEventListener('click', () => {
+  const btn = $('btn-turret-muzzles'); btn.classList.toggle('active');
+  turretMuzzleMarkers.forEach(m => (m.mesh.visible = btn.classList.contains('active')));
+});
+$('btn-reset-turret').addEventListener('click', () => {
+  state.muzzles = DEFAULTS.muzzles.map(m => ({ pos: [...m.pos] }));
+  state.turrets = DEFAULTS.turrets.map(t => ({ ...t, muzzles: [...t.muzzles], burst: [...t.burst], cd: [...t.cd] }));
+  buildTurretTab();
+  buildTurretHelpers();
+});
+
+// ----- ③ 发动机（程序化生成） -----
+const engineUIs = [];
+function buildEngineTab() {
+  const host = $('engine-list');
+  host.innerHTML = '';
+  engineUIs.length = 0;
+  const RANGES = { hit: { x: [-60, 60], y: [-15, 10], z: [-45, 45] }, smoke: { x: [-60, 60], y: [-15, 10], z: [-45, 45] } };
+  state.engines.forEach((e, i) => {
+    const grp = document.createElement('div');
+    grp.className = 'muz-group';
+    const title = document.createElement('div');
+    title.className = 'noz-title';
+    title.textContent = `发动机 ${i} · ${ENGINE_NAMES[i]}`;
+    grp.appendChild(title);
+    const ui = { ctrls: [] };
+    [['hitOffset', '命中点'], ['smokeOffset', '发烟点']].forEach(([field, label]) => {
+      const st = document.createElement('div');
+      st.className = 'sub-title';
+      st.textContent = label;
+      grp.appendChild(st);
+      ['x','y','z'].forEach((axis, ai) => {
+        const [mn, mx] = (field === 'hitOffset' ? RANGES.hit : RANGES.smoke)[axis];
+        const c = makeCtrl(grp, axis.toUpperCase(), mn, mx, 0.1, e[field][ai], (v) => {
+          e[field][ai] = v; updateEngineHelpers();
+        });
+        ui.ctrls.push({ c, get: () => e[field][ai] });
+      });
+    });
+    host.appendChild(grp);
+    engineUIs.push(ui);
+  });
+}
+function syncEngineUI() {
+  engineUIs.forEach((ui) => ui.ctrls.forEach(({ c, get }) => c.sync(get())));
+}
+$('btn-engine-markers').addEventListener('click', () => {
+  const btn = $('btn-engine-markers'); btn.classList.toggle('active');
+  const vis = btn.classList.contains('active');
+  engineHitMarkers.forEach(m => (m.visible = vis));
+  engineSmokeMarkers.forEach(m => (m.visible = vis));
+});
+$('btn-reset-engine').addEventListener('click', () => {
+  state.engines = DEFAULTS.engines.map(e => ({ hitOffset: [...e.hitOffset], smokeOffset: [...e.smokeOffset] }));
+  buildEngineTab();
+  updateEngineHelpers();
+});
+
+// ----- ④ 命中球（程序化生成） -----
+const hitUIs = [];
+const HIT_LABELS = ['躯干', '右内发', '左内发', '右外发', '左外发', '右翼尖', '左翼尖', '尾部'];
+function buildHitTab() {
+  const host = $('hit-list');
+  host.innerHTML = '';
+  hitUIs.length = 0;
+  state.hitSpheres.forEach((h, i) => {
+    const grp = document.createElement('div');
+    grp.className = 'muz-group';
+    const title = document.createElement('div');
+    title.className = 'grp-title';
+    title.style.color = (h.engine === null) ? '#40a0ff' : '#ffa040';
+    title.textContent = `命中球 ${i} · ${HIT_LABELS[i] || ''}`;
+    grp.appendChild(title);
+    const ui = { ctrls: [], title };
+    const XYZ = [[-60, 60], [-15, 10], [-45, 45]];
+    ['X','Y','Z'].forEach((axis, ai) => {
+      const c = makeCtrl(grp, axis, XYZ[ai][0], XYZ[ai][1], 0.1, h.offset[ai], (v) => {
+        h.offset[ai] = v; updateHitHelpers();
+      });
+      ui.ctrls.push({ c, get: () => h.offset[ai] });
+    });
+    const cr = makeCtrl(grp, 'radius', 1, 25, 0.5, h.radius, (v) => { h.radius = v; updateHitHelpers(); });
+    ui.ctrls.push({ c: cr, get: () => h.radius });
+    // engine 索引下拉
+    const row = document.createElement('div');
+    row.className = 'ctrl';
+    const lb = document.createElement('label');
+    lb.textContent = 'engine';
+    const sel = document.createElement('select');
+    [['', '无（机体）'], ['0', '0 右内'], ['1', '1 左内'], ['2', '2 右外'], ['3', '3 左外']].forEach(([v, t]) => {
+      const op = document.createElement('option');
+      op.value = v; op.textContent = t;
+      sel.appendChild(op);
+    });
+    sel.value = h.engine === null ? '' : String(h.engine);
+    sel.addEventListener('change', () => {
+      h.engine = sel.value === '' ? null : +sel.value;
+      title.style.color = (h.engine === null) ? '#40a0ff' : '#ffa040';
+      updateHitHelpers();
+    });
+    row.appendChild(lb); row.appendChild(sel);
+    grp.appendChild(row);
+    ui.sel = sel;
+    host.appendChild(grp);
+    hitUIs.push(ui);
+  });
+}
+function syncHitUI() {
+  hitUIs.forEach((ui, i) => {
+    ui.ctrls.forEach(({ c, get }) => c.sync(get()));
+    const h = state.hitSpheres[i];
+    ui.sel.value = h.engine === null ? '' : String(h.engine);
+    ui.title.style.color = (h.engine === null) ? '#40a0ff' : '#ffa040';
+  });
+}
+$('btn-hit-markers').addEventListener('click', () => {
+  const btn = $('btn-hit-markers'); btn.classList.toggle('active');
+  hitSphereMarkers.forEach(m => (m.visible = btn.classList.contains('active')));
+});
+$('btn-reset-hit').addEventListener('click', () => {
+  state.hitSpheres = DEFAULTS.hitSpheres.map(h => ({ offset: [...h.offset], radius: h.radius, engine: h.engine }));
+  buildHitTab();
+  buildHitHelpers();
+});
+
+// ----- ⑤ 节点 -----
+$('btn-nodes-all').addEventListener('click', () => {
+  state.hiddenNodes.clear();
+  if (model) model.traverse((o) => { if (o.isMesh) o.visible = true; });
+  buildNodeList();
+});
+$('btn-nodes-none').addEventListener('click', () => {
+  if (model) model.traverse((o) => { if (o.isMesh && o.name) { o.visible = false; state.hiddenNodes.add(o.name); } });
+  buildNodeList();
+});
+
+// ----- ⑥ 参数 -----
+const paramMap = [
+  ['p-hp','p-hp-n','hp'],['p-dmg','p-dmg-n','damageThreshold'],['p-spd','p-spd-n','speed'],
+  ['p-bspd','p-bspd-n','bulletSpeed'],['p-tdmin','p-tdmin-n','turretDamageMin'],['p-tdmax','p-tdmax-n','turretDamageMax'],
+];
+paramMap.forEach(([r,n,k]) => bindSlider(r, n, (v) => { state.param[k] = v; }));
+$('btn-reset-param').addEventListener('click', () => {
+  Object.assign(state.param, DEFAULTS.param); syncParamUI();
+});
+function syncParamUI() {
+  paramMap.forEach(([r,n,k]) => { $(r).value = state.param[k]; $(n).value = state.param[k]; });
+}
+
+// ----- 顶栏：包围盒 / 世界轴 -----
+$('btn-bbox').addEventListener('click', () => {
+  const btn = $('btn-bbox'); btn.classList.toggle('active');
+  if (btn.classList.contains('active')) {
+    if (!bboxHelper && model) { bboxHelper = new THREE.BoxHelper(model, 0x6fd0ff); scene.add(bboxHelper); }
+    if (bboxHelper) bboxHelper.visible = true;
+  } else {
+    if (bboxHelper) bboxHelper.visible = false;
+  }
+});
+
+$('btn-axis').addEventListener('click', () => {
+  const btn = $('btn-axis'); btn.classList.toggle('active');
+  worldAxis.visible = btn.classList.contains('active');
+});
+worldAxis.visible = false;
+$('btn-axis').classList.remove('active');
+
+// ----- Tab 切换 -----
+document.querySelectorAll('.tabs button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.tab-content').forEach((c) => c.classList.toggle('active', c.id === 'tab-' + tab));
+  });
+});
+
+// ====================================================================
+// 导出系统（按部分单独导出 → enemy.js MODEL_CONFIGS / level_04_berlin.js bomberStream）
+// ====================================================================
+function fmtNum(n, prec = 2) {
+  return (n >= 0 ? ' ' : '') + Number(n).toFixed(prec);
+}
+/** 坐标数组格式化：整数值不带小数点（对齐 level_04_berlin.js 风格） */
+function fmtArr(a) {
+  return '[' + a.map(v => Number.isInteger(v) ? String(v) : String(+v.toFixed(2))).join(', ') + ']';
+}
+
+// ① 校准 -> enemy.js MODEL_CONFIGS 条目
+function exportCalib() {
+  const b = state.base;
+  const gear = Array.from(state.hiddenNodes).sort();
+  return [
+    "// ① 校准 -> js/enemy.js MODEL_CONFIGS（替换 '/model/b17.glb' 条目）",
+    "'/model/b17.glb': {",
+    '  autoOrient: ' + b.autoOrient + ',',
+    '  yawOffset: ' + b.yaw.toFixed(1) + ', pitchOffset: ' + b.pitch.toFixed(1) + ', rollOffset: ' + b.roll.toFixed(1) + ',',
+    '  userScale: ' + (+b.scale.toFixed(2)) + ',',
+    '  centerOffset: [' + (+b.cx.toFixed(2)) + ', ' + (+b.cy.toFixed(2)) + ', ' + (+b.cz.toFixed(2)) + '],',
+    "  propNodes: ['helice03_FACES01', 'helice03_FACES02', 'helice03_FACES03', 'helice03_FACES04'],",
+    '  propSpinSpeed: ' + DEFAULTS.propSpinSpeed + ',',
+    '  propOpacity: ' + DEFAULTS.propOpacity.toFixed(2) + ',',
+    '  propBlurDisc: false,       // 模型自带半透明模糊盘，无需程序化生成',
+    '  hideGear: ' + (gear.length ? 'true' : 'false') + ',',
+    '  hideGearNodes: [' + gear.map(g => "'" + g + "'").join(', ') + '],',
+    '},',
+  ].join('\n');
+}
+
+// ② 炮塔 + 枪口
+function exportTurret() {
+  const mz = state.muzzles.map((m, i) => {
+    const grp = i < 2 ? '球塔（机腹）' : i < 4 ? '顶炮（机背）' : i < 6 ? '尾炮' : '颊炮（机头）';
+    const lead = (i % 2 === 0) ? `  { pos: ${fmtArr(m.pos)} },   // ${i}-${i+1} ${grp}` : `  { pos: ${fmtArr(m.pos)} },`;
+    return lead;
+  });
+  const tt = state.turrets.map(t => {
+    return `  { name: '${t.name}', ${' '.repeat(Math.max(1, 6 - t.name.length))}muzzles: [${t.muzzles.join(', ')}], ` +
+      `yawCenter: ${t.yawCenter}, ${t.yawCenter === 0 ? ' ' : ''}  yawRange: ${t.yawRange}, ` +
+      `pitchCenter: ${t.pitchCenter}, ${t.pitchCenter >= 0 ? ' ' : ''} pitchRange: ${t.pitchRange},\n` +
+      `    range: ${t.range}, burst: [${t.burst[0].toFixed(1)}, ${t.burst[1].toFixed(1)}], ` +
+      `cd: [${t.cd[0].toFixed(1)}, ${t.cd[1].toFixed(1)}], spreadDeg: ${t.spreadDeg.toFixed(1)}, fireRate: ${t.fireRate.toFixed(2)} },`;
+  });
+  return [
+    '// ② 炮塔+枪口 -> level_04_berlin.js bomberStream',
+    '// 枪口位置（body frame，b17_tuner 标定）',
+    'muzzles: [',
+    mz.join('\n'),
+    '],',
+    '',
+    '// 炮塔（射界约定：yaw 0=正后 / ±90=侧 / 180=正前；pitch 正=上）',
+    'turrets: [',
+    tt.join('\n'),
+    '],',
+  ].join('\n');
+}
+
+// ③ 发动机
+function exportEngine() {
+  const lines = state.engines.map((e, i) => {
+    const pad = i === 3 ? '' : ' ';
+    return `  { hitOffset: ${fmtArr(e.hitOffset)},${e.hitOffset[0] >= 0 ? ' ' : ''} smokeOffset: ${fmtArr(e.smokeOffset)} },${pad}// ${ENGINE_NAMES[i]}`;
+  });
+  return [
+    '// ③ 发动机 -> level_04_berlin.js bomberStream.engines',
+    '// 四发动机（命中点 + 发烟点，body frame）',
+    'engines: [',
+    lines.join('\n'),
+    '],',
+  ].join('\n');
+}
+
+// ④ 命中球
+function exportHit() {
+  const lines = state.hitSpheres.map((h, i) => {
+    const eng = h.engine === null ? 'null' : String(h.engine);
+    const cmt = HIT_LABELS[i] ? `  // ${HIT_LABELS[i]}` : '';
+    return `  { offset: ${fmtArr(h.offset)}, ${h.offset.join(',').length < 12 ? ' ' : ''} radius: ${h.radius}, engine: ${eng} },${cmt}`;
+  });
+  return [
+    '// ④ 命中球 -> level_04_berlin.js bomberStream.hitSpheres',
+    '// 命中球（大机体多球近似；offset 为 body frame，engine=发动机索引 null=机体）',
+    'hitSpheres: [',
+    lines.join('\n'),
+    '],',
+  ].join('\n');
+}
+
+// ⑤ 隐藏节点
+function exportNodes() {
+  const arr = Array.from(state.hiddenNodes).sort();
+  const list = arr.length ? "'" + arr.join("', '") + "'" : '';
+  return [
+    '// ⑤ 隐藏节点 -> js/enemy.js MODEL_CONFIGS（节点页勾选结果）',
+    'hideGear: ' + (arr.length ? 'true' : 'false') + ',',
+    'hideGearNodes: [' + list + '],   // 起落架轮组等待隐藏节点',
+  ].join('\n');
+}
+
+// ⑥ 参数
+function exportParam() {
+  const p = state.param;
+  return [
+    '// ⑥ 参数 -> level_04_berlin.js bomberStream 顶层',
+    "model: '/model/b17.glb',",
+    `speed: ${p.speed},                    // 巡航速度（m/s，史实 300km/h≈83，略加快）`,
+    `hp: ${p.hp},                      // 高 HP 池`,
+    `damageThreshold: ${p.damageThreshold.toFixed(2)},        // 受伤阈值（损失比例 → 脱离编队返航）`,
+    `bulletSpeed: ${p.bulletSpeed},`,
+    `turretDamage: [${p.turretDamageMin}, ${p.turretDamageMax}],         // 单发伤害（.50 口径，命中真实但伤害轻）`,
+  ].join('\n');
+}
+
+// 全量 bomberStream（level_04_berlin.js，逐字段对齐；route/formation/despawnX 非本台调节项，原样保留）
+function exportAll() {
+  return [
+    '// ════════════════════════════════════════════════════════════',
+    '// 全量 bomberStream -> js/config/levels/level_04_berlin.js',
+    '// B-17 轰炸机群（HeavyBomber，GameRuntime 门控创建，不走 WaveDirector）',
+    '//   东缘 x=+38km 出生 → 向西直飞（~87m/s ≈ 14 分钟航程）；',
+    '//   4 小队 × V 字三机 = 12 架箱式队形（横向错位 + 高低差）；',
+    '//   直飞不规避，受伤阈值后脱离编队返航；炮塔射界内带提前量瞄准。',
+    '// ════════════════════════════════════════════════════════════',
+    'bomberStream: {',
+    "  model: '/model/b17.glb',",
+    `  speed: ${state.param.speed},                    // 巡航速度（m/s，史实 300km/h≈83，略加快）`,
+    `  hp: ${state.param.hp},                      // 高 HP 池`,
+    `  damageThreshold: ${state.param.damageThreshold.toFixed(2)},        // 受伤阈值（损失 55% 生命 → 脱离编队返航）`,
+    '  despawnX: -38000,             // 西缘消失',
+    '  route: [',
+    '    { x: 38000, y: 5000, z: 0 },   // 出生（最东）',
+    '    { x: -38000, y: 5000, z: 0 },  // 脱离（最西）',
+    '  ],',
+    '',
+    '  // 编队槽位（相对 route[0] 的固定偏移；x+ = 更晚到达的纵队）',
+    '  formation: {',
+    '    vicSpacing: 700,            // 小队纵距',
+    '    wingSpacing: 320,           // V 字僚机横距',
+    '    trailOffset: 380,           // 僚机后撤',
+    '    // 4 小队：领队 / 高二队（右后高 150）/ 低三队（左后低 150）/ 四队收尾',
+    '    vics: [',
+    '      { x: 0,    alt: 0,    lat: 0 },',
+    '      { x: 700,  alt: 150,  lat: 900 },',
+    '      { x: 1400, alt: -150, lat: -900 },',
+    '      { x: 2100, alt: 50,   lat: 0 },',
+    '    ],',
+    '  },',
+    '',
+    '  ' + exportHit().split('\n').slice(1).join('\n  '),
+    '',
+    '  ' + exportEngine().split('\n').slice(1).join('\n  '),
+    '',
+    '  ' + exportTurret().split('\n').slice(1).join('\n  '),
+    `  bulletSpeed: ${state.param.bulletSpeed},`,
+    `  turretDamage: [${state.param.turretDamageMin}, ${state.param.turretDamageMax}],         // 单发伤害（.50 口径，命中真实但伤害轻）`,
+    '},',
+  ].join('\n');
+}
+
+let currentExport = 'all';
+function refreshExport() {
+  const map = {
+    all: exportAll,
+    calib: exportCalib,
+    turret: exportTurret,
+    engine: exportEngine,
+    hit: exportHit,
+    nodes: exportNodes,
+    param: exportParam,
+  };
+  const fn = map[currentExport] || exportAll;
+  $('export-text').value = fn();
+  document.querySelectorAll('.export-tabs button').forEach(b => b.classList.toggle('active', b.dataset.export === currentExport));
+}
+
+$('btn-export').addEventListener('click', () => {
+  refreshExport();
+  $('export-modal').classList.add('show');
+});
+document.querySelectorAll('.export-tabs button').forEach((b) => {
+  b.addEventListener('click', () => { currentExport = b.dataset.export; refreshExport(); });
+});
+$('btn-copy-export').addEventListener('click', () => {
+  navigator.clipboard.writeText($('export-text').value).then(() => {
+    const btn = $('btn-copy-export'); btn.textContent = '已复制 ✓';
+    setTimeout(() => (btn.textContent = '复制'), 1500);
+  });
+});
+$('btn-close-export').addEventListener('click', () => $('export-modal').classList.remove('show'));
+
+// ====================================================================
+// 状态条
+// ====================================================================
+function setStatus(msg, kind) {
+  const el = $('status');
+  el.textContent = msg;
+  el.className = kind || '';
+}
+
+// ====================================================================
+// 自适应
+// ====================================================================
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ====================================================================
+// 启动
+// ====================================================================
+syncBaseUI(); syncParamUI();
+buildTurretTab(); buildEngineTab(); buildHitTab();
+loadModel().then(() => { animate(); }).catch((err) => {
+  document.getElementById('loader-err').textContent = '加载失败：' + (err.message || err);
+  setStatus('加载失败：' + (err.message || err), 'err');
+});
+</script>
+</body>
+</html>

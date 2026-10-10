@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="/favicon.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>勇气之翼 · Wings of Courage</title>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <canvas id="indicator"></canvas>
+  <div id="app"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/vendor/three/build/three.module.js",
+      "three/addons/": "/vendor/three/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

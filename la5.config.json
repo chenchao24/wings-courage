@@ -1,0 +1,3120 @@
+{
+  "model": "la5.glb",
+  "transform": {
+    "position": [
+      0,
+      -0.054,
+      0
+    ],
+    "rotationDeg": [
+      0,
+      0,
+      0
+    ],
+    "rotationRad": [
+      0,
+      0,
+      0
+    ],
+    "scale": 0.496
+  },
+  "parts": [
+    {
+      "nodeName": "Sketchfab_model",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "LA5WRLcleanermaterialmergergles",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Torus03",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_3",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Torus03-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Torus03-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder20",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_7",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder20-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder20-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder02_0",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_11",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder02_0-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder02_0-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder21",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_15",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder21-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder21-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder84",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_19",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder84-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder84-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder16",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_23",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder16-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder16-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Box03",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_27",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box03-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box03-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Box04",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_31",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box04-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box04-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder103",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_35",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder103-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder103-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder101",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_39",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder101-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder101-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder100",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_43",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder100-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder100-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Torus02",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_47",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Torus02-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Torus02-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder99",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_51",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder99-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder99-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder98",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_55",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder98-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder98-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder97",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_59",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder97-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder97-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Object03",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_63",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object03-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object03-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Box06",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_67",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box06-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box06-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Box05",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_71",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box05-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box05-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder109",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_75",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder109-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder109-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder108",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_79",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder108-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder108-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder107",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_83",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder107-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder107-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder106",
+      "type": "Object3D",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Object_87",
+      "type": "Object3D",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder106-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder106-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder105",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_91",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder105-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder105-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Cylinder104",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_95",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder104-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder104-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Torus04",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_99",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Torus04-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Torus04-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Group08",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_103",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box23",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_105",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box23-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box23-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box33",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_109",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box33-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box33-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box32",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_113",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box32-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box32-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box31",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_117",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box31-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box31-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box11",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_121",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box11-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box11-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box12",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_125",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box12-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box12-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box13",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_129",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box13-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box13-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box14",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_133",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box14-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box14-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box15",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_137",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box15-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box15-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box16",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_141",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box16-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box16-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box17",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_145",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box17-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box17-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box18",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_149",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box18-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box18-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box19",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_153",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box19-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box19-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box20",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_157",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box20-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box20-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box21",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_161",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box21-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box21-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box22",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_165",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box22-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box22-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box30",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_169",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box30-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box30-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box24",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_173",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box24-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box24-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box25",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_177",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box25-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box25-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box26",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_181",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box26-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box26-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box27",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_185",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box27-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box27-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box28",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_189",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box28-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box28-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box29",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_193",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box29-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box29-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box34",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_197",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box34-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box34-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box09",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_201",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box09-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box09-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box08",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_205",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box08-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box08-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box10",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_209",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box10-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box10-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box07",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_213",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box07-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box07-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box35",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_217",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box35-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box35-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box36",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_221",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box36-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box36-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box37",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_225",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box37-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box37-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box38",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_229",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box38-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box38-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "KAB_M02",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_233",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "KAB_M02-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "KAB_M02-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "KAB_M02-FACES_2",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "KAB_M02-FACES_3",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "LineC05",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_239",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "LineC05-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "LineC05-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object06",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_243",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object06-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object06-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Circle15",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_247",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Circle15-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Circle15-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "KAB_M01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_251",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "KAB_M01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "KAB_M01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "KAB_M01-FACES_2",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "KAB_M01-FACES_3",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder03",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_257",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder03-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder03-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder03-FACES_2",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder03-FACES_3",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Sphere04",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_263",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Sphere04-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Sphere04-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Sphere03",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_267",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Sphere03-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Sphere03-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line03",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_271",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line03-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line03-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder102",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_275",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_276",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_277",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Group06",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_279",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube09",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_281",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube09-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube09-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube10",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_285",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube10-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube10-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube11",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_289",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube11-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube11-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube12",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_293",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube12-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube12-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube13",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_297",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube13-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube13-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube14",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_301",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube14-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube14-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube15",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_305",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube15-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube15-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube16",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_309",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube16-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube16-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Group05",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_313",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube04",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_315",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube04-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube04-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube03",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_319",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube03-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube03-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube02",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_323",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube02-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube02-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_327",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube05",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_331",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube05-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube05-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube06",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_335",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube06-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube06-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube07",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_339",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube07-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube07-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube08",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_343",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube08-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Tube08-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object02",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_347",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object02-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object02-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "pilot",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_351",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "lShldr_01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_353",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "lShldr_01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "lShldr_01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "head_01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_357",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "head_01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "head_01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "rCollar_01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_361",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "rCollar_01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "rCollar_01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "neck_01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_365",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "neck_01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "neck_01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "rShldr_01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_369",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "rShldr_01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "rShldr_01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "rHand_01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_373",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "rHand_01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "rHand_01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "rForeArm_0",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_377",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "rForeArm_0-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "rForeArm_0-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "abdomen_01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_381",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "abdomen_01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "abdomen_01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "lHand_01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_385",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "lHand_01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "lHand_01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "figureHair",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_389",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "figureHair-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "figureHair-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "lCollar_01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_393",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "lCollar_01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "lCollar_01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box01_0",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_397",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box01_0-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box01_0-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box02",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_401",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box02-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box02-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "chest_01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_405",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "chest_01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "chest_01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "lForeArm_0",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_409",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "lForeArm_0-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "lForeArm_0-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line05",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_413",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line05-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line05-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "PILOT_BODY",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_417",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "PILOT_BODY-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "PILOT_BODY-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object05",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_421",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object05-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object05-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": true
+    },
+    {
+      "nodeName": "Line_R01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_425",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line_R01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line_R01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder02",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_429",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_430",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_431",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_433",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Box01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line__II07",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_437",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line__II07-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line__II07-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line_G12",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_441",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line_G12-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line_G12-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "ChamferBox04",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_445",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "ChamferBox04-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "ChamferBox04-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "ChamferBox03",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_449",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "ChamferBox03-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "ChamferBox03-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "ChamferBox02",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_453",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "ChamferBox02-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "ChamferBox02-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "ChamferBox01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_457",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "ChamferBox01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "ChamferBox01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line02",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_461",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line02-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line02-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_465",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Line01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder95",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_469",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder95-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder95-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_473",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "LineC04",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_477",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "LineC04-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "LineC04-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Circle14",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_481",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Circle14-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Circle14-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Circle12",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_485",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Circle12-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Circle12-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Group01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_489",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder92",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_491",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder92-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder92-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Sphere01",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_495",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Sphere01-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Sphere01-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "vint",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_499",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder77",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_501",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder77-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder77-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder93",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_505",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder93-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder93-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder94",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_509",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder94-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Cylinder94-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Sphere02",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Object_513",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Sphere02-FACES",
+      "type": "Object3D",
+      "label": "",
+      "hidden": false
+    },
+    {
+      "nodeName": "Sphere02-FACES_1",
+      "type": "Mesh",
+      "label": "",
+      "hidden": false
+    }
+  ],
+  "markers": []
+}

@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>库尔斯克地图编辑器</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a1a; color: #e0d8c8; font-family: system-ui, sans-serif; overflow: hidden; height: 100vh; }
+.app { display: flex; flex-direction: column; height: 100vh; }
+
+/* 顶部工具栏 */
+header { background: #222; padding: 8px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid #333; }
+header h1 { font-size: 15px; color: #f0e8d8; white-space: nowrap; }
+.toolbar { display: flex; gap: 4px; flex-wrap: wrap; }
+.tool-btn { background: #333; color: #ccc; border: 1px solid #444; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; white-space: nowrap; }
+.tool-btn:hover { background: #444; color: #fff; }
+.tool-btn.active { background: #4a6a8a; color: #fff; border-color: #5a7a9a; }
+.tool-btn.danger { background: #5a2a2a; border-color: #7a3a3a; }
+.tool-btn.danger:hover { background: #7a3a3a; }
+
+/* 类型选择 */
+.type-selector { display: flex; gap: 3px; align-items: center; padding-left: 8px; border-left: 1px solid #444; }
+.type-selector label { font-size: 11px; color: #888; margin-right: 4px; }
+.type-btn { padding: 4px 8px; font-size: 11px; border-radius: 3px; cursor: pointer; border: 2px solid transparent; }
+.type-btn.active { border-color: #fff; }
+
+/* 主区域 */
+main { display: flex; flex: 1; overflow: hidden; }
+.canvas-wrap { flex: 1; overflow: auto; background: #111; display: flex; align-items: center; justify-content: center; }
+canvas { background: #8a9038; cursor: crosshair; }
+
+/* 侧边栏 */
+aside { width: 340px; background: #222; border-left: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
+aside section { border-bottom: 1px solid #333; }
+aside section h2 { font-size: 12px; color: #9a9080; padding: 8px 12px; background: #1a1a1a; }
+.section-body { padding: 8px 12px; }
+
+/* 标注列表 */
+.marker-list { flex: 1; overflow-y: auto; max-height: calc(100vh - 480px); }
+.marker-item { background: #2a2a2a; padding: 8px 10px; margin-bottom: 4px; border-radius: 3px; border-left: 3px solid #555; cursor: pointer; font-size: 12px; }
+.marker-item:hover { background: #333; }
+.marker-item.selected { background: #3a3a4a; border-left-color: #7a9aba; }
+.marker-item .mi-label { color: #e0d8c8; font-weight: 600; }
+.marker-item .mi-coords { color: #777; font-size: 10px; font-family: monospace; }
+.marker-item .mi-note { color: #999; font-size: 11px; margin-top: 2px; }
+.marker-item .mi-type { font-size: 10px; padding: 1px 5px; border-radius: 2px; margin-left: 4px; }
+
+/* 表单 */
+input[type=text], textarea { background: #1a1a1a; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 5px 8px; font-size: 12px; width: 100%; font-family: inherit; }
+textarea { resize: vertical; min-height: 50px; }
+label { font-size: 11px; color: #888; display: block; margin-bottom: 3px; margin-top: 6px; }
+.form-row { display: flex; gap: 8px; }
+.form-row > div { flex: 1; }
+.btn-row { display: flex; gap: 4px; margin-top: 8px; }
+.btn { padding: 5px 10px; font-size: 11px; border-radius: 3px; cursor: pointer; border: 1px solid #444; }
+.btn-primary { background: #3a5a7a; color: #fff; }
+.btn-secondary { background: #333; color: #ccc; }
+.btn-danger { background: #5a2a2a; color: #daa; }
+
+/* 导出区 */
+.export-area { background: #1a1a1a; color: #9a8a7a; border: 1px solid #444; border-radius: 3px; padding: 6px; font-size: 10px; font-family: monospace; width: 100%; min-height: 100px; max-height: 200px; resize: vertical; }
+
+/* 底部状态栏 */
+footer { background: #1a1a1a; padding: 4px 16px; font-size: 11px; color: #777; display: flex; justify-content: space-between; border-top: 1px solid #333; }
+#status-coords { font-family: monospace; color: #aaa; }
+#status-hint { color: #6a8a6a; }
+
+/* 弹出编辑框 */
+.edit-popup { position: fixed; background: #2a2a2a; border: 1px solid #555; border-radius: 4px; padding: 12px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: none; min-width: 260px; }
+.edit-popup.show { display: block; }
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #1a1a1a; }
+::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 顶部工具栏 -->
+  <header>
+    <h1>🗺️ 库尔斯克地图编辑器</h1>
+    <div class="toolbar">
+      <button class="tool-btn active" data-tool="select">选择/移动</button>
+      <button class="tool-btn" data-tool="point">点标注</button>
+      <button class="tool-btn" data-tool="polygon">多边形区域</button>
+      <button class="tool-btn" data-tool="rect">矩形区域</button>
+      <button class="tool-btn" data-tool="path">路径线</button>
+    </div>
+    <div class="type-selector">
+      <label>类型:</label>
+      <button class="type-btn active" data-type="spawn" style="background:#d44;color:#fff">出生点</button>
+      <button class="type-btn" data-type="enemy" style="background:#a33;color:#fff">敌机</button>
+      <button class="type-btn" data-type="friendly" style="background:#36a;color:#fff">友军</button>
+      <button class="type-btn" data-type="event" style="background:#aa3;color:#222">事件</button>
+      <button class="type-btn" data-type="waypoint" style="background:#3a3;color:#fff">路径点</button>
+      <button class="type-btn" data-type="custom" style="background:#93c;color:#fff">自定义</button>
+    </div>
+    <div class="toolbar" style="margin-left:auto">
+      <button class="tool-btn" id="btn-undo">撤销</button>
+      <button class="tool-btn" id="btn-import">导入</button>
+      <button class="tool-btn" id="btn-export">导出JSON</button>
+      <button class="tool-btn" id="btn-copy">复制到剪贴板</button>
+      <button class="tool-btn danger" id="btn-clear">清空</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="canvas-wrap">
+      <canvas id="c" width="960" height="860"></canvas>
+    </div>
+
+    <aside>
+      <section>
+        <h2>📊 标注列表 (<span id="marker-count">0</span>)</h2>
+        <div class="marker-list section-body" id="marker-list">
+          <div style="color:#666;font-size:12px;padding:8px">暂无标注。选择工具后在地图上点击添加。</div>
+        </div>
+      </section>
+
+      <section>
+        <h2>📝 导入 / 导出</h2>
+        <div class="section-body">
+          <label>JSON 数据（粘贴导入或复制导出）</label>
+          <textarea class="export-area" id="json-area" placeholder='{"markers":[]}'></textarea>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="btn-do-import">从文本导入</button>
+            <button class="btn btn-secondary" id="btn-do-export">刷新导出</button>
+            <button class="btn btn-danger" id="btn-delete-all">删除全部</button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>ℹ️ 使用说明</h2>
+        <div class="section-body" style="font-size:11px;color:#888;line-height:1.6">
+          <b style="color:#aaa">点标注</b>：选工具→选类型→点击地图<br>
+          <b style="color:#aaa">多边形</b>：点击添加顶点，双击/右键完成<br>
+          <b style="color:#aaa">矩形</b>：按下拖拽到对角释放<br>
+          <b style="color:#aaa">路径线</b>：依次点击路径点，双击结束<br>
+          <b style="color:#aaa">编辑</b>：选择模式下点击标注→右侧编辑<br>
+          <b style="color:#aaa">删除</b>：选中标注→Delete键 或 删除按钮<br>
+          <b style="color:#aaa">坐标</b>：x+东/z+北，原点=地图中心<br>
+          <b style="color:#aaa">自动保存</b>：每次修改自动存浏览器<br>
+          <b style="color:#aaa">导出</b>：复制JSON发给我即可
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <!-- 底部状态栏 -->
+  <footer>
+    <span id="status-coords">x: 0, z: 0</span>
+    <span id="status-hint">就绪</span>
+    <span>自动保存已开启</span>
+  </footer>
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="edit-popup" id="edit-popup">
+  <label>标签名称</label>
+  <input type="text" id="edit-label" placeholder="标注名称">
+  <label>备注说明</label>
+  <textarea id="edit-note" placeholder="备注（高度、时间、事件描述等）"></textarea>
+  <div class="btn-row">
+    <button class="btn btn-primary" id="edit-save">保存</button>
+    <button class="btn btn-danger" id="edit-delete">删除标注</button>
+    <button class="btn btn-secondary" id="edit-cancel">取消</button>
+  </div>
+</div>
+
+<script>
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+// ===== 坐标范围（与 roadMap.html 一致）=====
+const XMIN=-16000, XMAX=19000, ZMIN=-16000, ZMAX=16000;
+const W=cv.width, H=cv.height;
+const PAD=40;
+const sx_ = (W-PAD*2)/(XMAX-XMIN);
+const sz_ = (H-PAD*2)/(ZMAX-ZMIN);
+const s = Math.min(sx_, sz_);
+function px(x){ return PAD + (x-XMIN)*s; }
+function pz(z){ return PAD + (ZMAX-z)*s; }
+function wx(p){ return (p-PAD)/s + XMIN; }
+function wz(p){ return ZMAX - (p-PAD)/s; }
+
+// ===== 标注类型配置 =====
+const TYPE_CONFIG = {
+  spawn:    { label:'出生点', color:'#d44', fill:'rgba(210,60,60,0.15)', icon:'★' },
+  enemy:    { label:'敌机',   color:'#a33', fill:'rgba(170,50,50,0.25)', icon:'✖' },
+  friendly: { label:'友军',   color:'#36a', fill:'rgba(50,100,170,0.25)', icon:'◆' },
+  event:    { label:'事件',   color:'#aa3', fill:'rgba(170,170,50,0.25)', icon:'▲' },
+  waypoint: { label:'路径点', color:'#3a3', fill:'rgba(60,170,60,0.15)', icon:'●' },
+  custom:   { label:'自定义', color:'#93c', fill:'rgba(150,50,200,0.25)', icon:'■' },
+};
+
+// ===== 状态 =====
+let currentTool = 'select';
+let currentType = 'spawn';
+let markers = [];       // {id, type, label, note, kind:'point'|'polygon'|'rect'|'path', x,z 或 points:[[x,z]...]}
+let selectedId = null;
+let drawingPoints = []; // 多边形/路径正在绘制中的点
+let rectStart = null;   // 矩形起点
+let isDragging = false;
+let dragOffset = null;
+let hoverMarker = null;
+const STORAGE_KEY = 'kursk_map_editor_v1';
+
+// ===== 路网数据（与 kurskRoads.js 一致，参考显示）=====
+const ROADS = [
+  { pts:[[3500,14000],[3200,10000],[3800,6000],[3500,3000],[3300,0],[3700,-3000],[3400,-6000],[3800,-10000],[3500,-14000]], w:18, c:'#d0ccc6' },
+  { pts:[[3500,-2500],[0,-2800],[-4000,-2600],[-9000,-3000],[-14000,-2800]], w:14, c:'#d0ccc6' },
+  { pts:[[3800,5000],[8000,5200],[13000,5500],[17000,5800]], w:14, c:'#d0ccc6' },
+  { pts:[[3400,-6000],[0,-6500],[-4000,-7000],[-7500,-8000]], w:5, c:'#b8b4ae' },
+  { pts:[[3500,2000],[0,2500],[-4500,2200],[-8500,2500]], w:5, c:'#b8b4ae' },
+  { pts:[[3200,10000],[7000,10500],[11000,10000]], w:5, c:'#b8b4ae' },
+  { pts:[[3800,-10000],[7000,-11000],[11000,-12500]], w:5, c:'#b8b4ae' },
+  { pts:[[-4000,-2600],[-4200,-4500],[-4000,-7000]], w:4, c:'#b8b4ae' },
+  { pts:[[8000,5200],[8200,8000],[7800,11000]], w:4, c:'#b8b4ae' },
+  { pts:[[-4500,2200],[-5500,3000],[-6500,3500]], w:2.5, c:'#a09890' },
+  { pts:[[-4000,-7000],[-5000,-7500],[-5500,-8500]], w:2.5, c:'#a09890' },
+  { pts:[[3300,0],[2000,500],[800,800]], w:2.5, c:'#a09890' },
+  { pts:[[0,-2800],[-1000,-3500],[-2000,-4000]], w:2.5, c:'#a09890' },
+  { pts:[[3700,-3000],[5000,-2800],[6500,-3200]], w:2.5, c:'#a09890' },
+  { pts:[[3800,6000],[4500,6800],[4800,7600]], w:2.5, c:'#a09890' },
+  { pts:[[-9000,-3000],[-10000,-3800],[-10500,-4600]], w:2.5, c:'#a09890' },
+  { pts:[[13000,5500],[13500,6300],[13300,7200]], w:2.5, c:'#a09890' },
+];
+
+// Catmull-Rom 插值
+function cmr(p0,p1,p2,p3,t){
+  const t2=t*t,t3=t2*t;
+  return {
+    x:0.5*((2*p1[0])+(-p0[0]+p2[0])*t+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3),
+    y:0.5*((2*p1[1])+(-p0[1]+p2[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3),
+  };
+}
+function drawRoadLine(pts, wpx, color, alpha){
+  ctx.globalAlpha = alpha || 1.0;
+  ctx.strokeStyle=color; ctx.lineWidth=Math.max(1, wpx*s*0.5+1); ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.beginPath();
+  const p0=[2*pts[0][0]-pts[1][0], 2*pts[0][1]-pts[1][1]];
+  const pn=[2*pts[pts.length-1][0]-pts[pts.length-1][1]?pts[pts.length-2][1]:pts[pts.length-1][1], 2*pts[pts.length-1][1]-pts[pts.length-2][1]];
+  const all=[p0,...pts,pn];
+  let first=true;
+  for(let i=1;i<all.length-2;i++){
+    for(let t=0;t<=1;t+=0.1){
+      const p=cmr(all[i-1],all[i],all[i+1],all[i+2],t);
+      const X=px(p.x), Y=pz(p.y);
+      if(first){ctx.moveTo(X,Y); first=false;} else ctx.lineTo(X,Y);
+    }
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1.0;
+}
+
+// ===== 渲染 =====
+function render(){
+  // 草原底色
+  ctx.fillStyle = '#8a9038';
+  ctx.fillRect(0,0,W,H);
+  // 色斑
+  const patches = [
+    {x:-8000,z:3000,r:5000,c:'#7a8030'},
+    {x:6000,z:-5000,r:6000,c:'#9a9840'},
+    {x:-5000,z:-8000,r:4500,c:'#86883a'},
+    {x:10000,z:8000,r:5500,c:'#7e8434'},
+    {x:3000,z:12000,r:5000,c:'#909438'},
+    {x:-12000,z:-10000,r:4000,c:'#80863a'},
+  ];
+  patches.forEach(p=>{
+    const g=ctx.createRadialGradient(px(p.x),pz(p.z),0,px(p.x),pz(p.z),p.r*s);
+    g.addColorStop(0,p.c); g.addColorStop(1,'rgba(138,144,56,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(px(p.x),pz(p.z),p.r*s,0,7); ctx.fill();
+  });
+
+  // 坐标网格
+  ctx.strokeStyle='rgba(60,50,30,0.12)'; ctx.lineWidth=1;
+  for(let g=-15000; g<=18000; g+=2500){
+    ctx.beginPath(); ctx.moveTo(px(g),pz(ZMAX)); ctx.lineTo(px(g),pz(ZMIN)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px(XMIN),pz(g)); ctx.lineTo(px(XMAX),pz(g)); ctx.stroke();
+  }
+  ctx.strokeStyle='rgba(60,50,30,0.2)'; ctx.lineWidth=1;
+  for(let g=-15000; g<=18000; g+=5000){
+    ctx.beginPath(); ctx.moveTo(px(g),pz(ZMAX)); ctx.lineTo(px(g),pz(ZMIN)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px(XMIN),pz(g)); ctx.lineTo(px(XMAX),pz(g)); ctx.stroke();
+  }
+  // 坐标轴
+  ctx.strokeStyle='rgba(40,30,20,0.35)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(px(0),pz(ZMAX)); ctx.lineTo(px(0),pz(ZMIN)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px(XMIN),pz(0)); ctx.lineTo(px(XMAX),pz(0)); ctx.stroke();
+  // 刻度
+  ctx.fillStyle='#3a3328'; ctx.font='10px monospace'; ctx.textAlign='center';
+  for(let g=-15000; g<=18000; g+=5000){
+    if(g!==0) ctx.fillText((g/1000)+'km', px(g), pz(0)+14);
+  }
+  ctx.textAlign='right';
+  for(let g=-15000; g<=15000; g+=5000){
+    if(g!==0) ctx.fillText((g/1000)+'km', px(0)-4, pz(g)+3);
+  }
+  // 方位
+  ctx.fillStyle='#2a2218'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('北 z+', px(0), pz(ZMAX)-18);
+  ctx.fillText('南 z-', px(0), pz(ZMIN)+26);
+  ctx.save(); ctx.translate(px(XMAX)+18, pz(0)); ctx.rotate(-Math.PI/2); ctx.fillText('东 x+', 0,0); ctx.restore();
+  ctx.save(); ctx.translate(px(XMIN)-18, pz(0)); ctx.rotate(Math.PI/2); ctx.fillText('西 x-', 0,0); ctx.restore();
+
+  // 路网（参考显示，半透明）
+  ROADS.forEach(r => {
+    drawRoadLine(r.pts, r.w+8, r.c, 0.25);  // 扩散带
+    drawRoadLine(r.pts, r.w+4, '#eae6e0', 0.35);  // 路肩
+    drawRoadLine(r.pts, r.w, r.c, 0.7);  // 路面
+  });
+
+  // 玩家位置（原点参考）
+  const px0=px(0), py0=pz(0);
+  ctx.fillStyle='rgba(210,60,60,0.15)';
+  ctx.beginPath(); ctx.arc(px0,py0,18,0,7); ctx.fill();
+
+  // ===== 标注 =====
+  markers.forEach(m => drawMarker(m, m.id === selectedId));
+
+  // ===== 正在绘制的多边形/路径 =====
+  if(drawingPoints.length > 0){
+    const cfg = TYPE_CONFIG[currentType];
+    ctx.strokeStyle = cfg.color;
+    ctx.fillStyle = cfg.fill;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5,3]);
+    ctx.beginPath();
+    drawingPoints.forEach((p, i) => {
+      if(i===0) ctx.moveTo(px(p[0]), pz(p[1]));
+      else ctx.lineTo(px(p[0]), pz(p[1]));
+    });
+    if(currentTool === 'polygon') ctx.closePath();
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if(currentTool === 'polygon' && drawingPoints.length >= 3){
+      ctx.fill();
+    }
+    // 顶点
+    drawingPoints.forEach(p => {
+      ctx.fillStyle = cfg.color;
+      ctx.beginPath(); ctx.arc(px(p[0]), pz(p[1]), 4, 0, 7); ctx.fill();
+    });
+  }
+
+  // ===== 矩形预览 =====
+  if(rectStart && isDragging){
+    const cfg = TYPE_CONFIG[currentType];
+    ctx.strokeStyle = cfg.color;
+    ctx.fillStyle = cfg.fill;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5,3]);
+    const x1 = px(rectStart.x), y1 = pz(rectStart.z);
+    const x2 = cv.getBoundingClientRect().left ? 0 : 0; // unused
+    ctx.strokeRect(Math.min(x1, lastMouseX), Math.min(y1, lastMouseY), Math.abs(lastMouseX-x1), Math.abs(lastMouseY-y1));
+    ctx.fillRect(Math.min(x1, lastMouseX), Math.min(y1, lastMouseY), Math.abs(lastMouseX-x1), Math.abs(lastMouseY-y1));
+    ctx.setLineDash([]);
+  }
+}
+
+let lastMouseX = 0, lastMouseY = 0;
+
+function drawMarker(m, isSelected){
+  const cfg = TYPE_CONFIG[m.type] || TYPE_CONFIG.custom;
+  if(m.kind === 'point'){
+    const X = px(m.x), Y = pz(m.z);
+    // 光圈
+    if(isSelected){
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(X, Y, 12, 0, 7); ctx.stroke();
+    }
+    // 图标
+    ctx.fillStyle = cfg.fill.replace(/[\d.]+\)$/, '0.3)');
+    ctx.beginPath(); ctx.arc(X, Y, 10, 0, 7); ctx.fill();
+    ctx.fillStyle = cfg.color;
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(cfg.icon, X, Y);
+    // 标签
+    if(m.label){
+      ctx.font = '11px sans-serif';
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      const tw = ctx.measureText(m.label).width;
+      ctx.fillRect(X - tw/2 - 3, Y + 12, tw + 6, 14);
+      ctx.fillStyle = cfg.color;
+      ctx.fillText(m.label, X, Y + 19);
+    }
+  } else if(m.kind === 'polygon' || m.kind === 'rect' || m.kind === 'path'){
+    const pts = m.points;
+    if(pts.length < 2) return;
+    ctx.strokeStyle = cfg.color;
+    ctx.fillStyle = cfg.fill;
+    ctx.lineWidth = isSelected ? 3 : 2;
+    ctx.beginPath();
+    pts.forEach((p, i) => {
+      if(i===0) ctx.moveTo(px(p[0]), pz(p[1]));
+      else ctx.lineTo(px(p[0]), pz(p[1]));
+    });
+    if(m.kind !== 'path') ctx.closePath();
+    if(m.kind !== 'path') ctx.fill();
+    ctx.stroke();
+    // 顶点
+    if(isSelected){
+      pts.forEach(p => {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(px(p[0]), pz(p[1]), 4, 0, 7); ctx.fill();
+        ctx.fillStyle = cfg.color;
+        ctx.beginPath(); ctx.arc(px(p[0]), pz(p[1]), 3, 0, 7); ctx.fill();
+      });
+    }
+    // 标签（中心点）
+    if(m.label){
+      let cx=0, cz=0;
+      pts.forEach(p => { cx += p[0]; cz += p[1]; });
+      cx /= pts.length; cz /= pts.length;
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const tw = ctx.measureText(m.label).width;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(px(cx)-tw/2-4, pz(cz)-8, tw+8, 16);
+      ctx.fillStyle = cfg.color;
+      ctx.fillText(m.label, px(cx), pz(cz));
+    }
+  }
+}
+
+// ===== 鼠标交互 =====
+function getMousePos(e){
+  const r = cv.getBoundingClientRect();
+  return { mx: e.clientX - r.left, my: e.clientY - r.top };
+}
+
+cv.addEventListener('mousemove', e => {
+  const { mx, my } = getMousePos(e);
+  lastMouseX = mx; lastMouseY = my;
+  const x = Math.round(wx(mx)), z = Math.round(wz(my));
+  document.getElementById('status-coords').textContent = `x: ${x}, z: ${z}`;
+
+  if(isDragging && selectedId){
+    const m = markers.find(m => m.id === selectedId);
+    if(m){
+      if(m.kind === 'point'){
+        m.x = x; m.z = z;
+      } else {
+        // 拖拽整个区域
+        if(dragOffset){
+          m.points = m.points.map(p => [p[0] + (x - dragOffset.x), p[1] + (z - dragOffset.z)]);
+          dragOffset = { x, z };
+        }
+      }
+      render();
+      autoSave();
+    }
+  }
+  render();
+});
+
+cv.addEventListener('mousedown', e => {
+  const { mx, my } = getMousePos(e);
+  const x = Math.round(wx(mx)), z = Math.round(wz(my));
+
+  if(currentTool === 'select'){
+    // 查找点击的标注
+    const hit = hitTest(mx, my);
+    if(hit){
+      selectedId = hit.id;
+      if(hit.kind === 'point'){
+        isDragging = true;
+      } else {
+        isDragging = true;
+        dragOffset = { x, z };
+      }
+      updateMarkerList();
+      showEditPopup(hit, e.clientX, e.clientY);
+    } else {
+      selectedId = null;
+      hideEditPopup();
+      updateMarkerList();
+    }
+    render();
+  } else if(currentTool === 'rect'){
+    rectStart = { x, z };
+    isDragging = true;
+  }
+});
+
+cv.addEventListener('mouseup', e => {
+  if(currentTool === 'rect' && rectStart && isDragging){
+    const { mx, my } = getMousePos(e);
+    const x2 = Math.round(wx(mx)), z2 = Math.round(wz(my));
+    const x1 = rectStart.x, z1 = rectStart.z;
+    if(Math.abs(x2-x1) > 50 && Math.abs(z2-z1) > 50){
+      const m = {
+        id: 'rect_' + Date.now(),
+        type: currentType,
+        kind: 'rect',
+        label: TYPE_CONFIG[currentType].label + '区域',
+        note: '',
+        points: [[Math.min(x1,x2), Math.min(z1,z2)], [Math.max(x1,x2), Math.min(z1,z2)], [Math.max(x1,x2), Math.max(z1,z2)], [Math.min(x1,x2), Math.max(z1,z2)]],
+      };
+      markers.push(m);
+      selectedId = m.id;
+      updateMarkerList();
+      autoSave();
+    }
+    rectStart = null;
+    isDragging = false;
+    render();
+  }
+  isDragging = false;
+  dragOffset = null;
+});
+
+cv.addEventListener('click', e => {
+  if(currentTool === 'select' || currentTool === 'rect') return;
+  const { mx, my } = getMousePos(e);
+  const x = Math.round(wx(mx)), z = Math.round(wz(my));
+
+  if(currentTool === 'point'){
+    const m = {
+      id: 'pt_' + Date.now(),
+      type: currentType,
+      kind: 'point',
+      label: TYPE_CONFIG[currentType].label + '点',
+      note: '',
+      x, z,
+    };
+    markers.push(m);
+    selectedId = m.id;
+    updateMarkerList();
+    autoSave();
+    render();
+    setHint('已添加点标注: ' + m.label + ' (' + x + ', ' + z + ')');
+  } else if(currentTool === 'polygon' || currentTool === 'path'){
+    drawingPoints.push([x, z]);
+    setHint(currentTool === 'polygon' ? `多边形: ${drawingPoints.length}个顶点，双击完成` : `路径: ${drawingPoints.length}个点，双击结束`);
+    render();
+  }
+});
+
+cv.addEventListener('dblclick', e => {
+  if((currentTool === 'polygon' || currentTool === 'path') && drawingPoints.length >= 2){
+    const m = {
+      id: currentTool + '_' + Date.now(),
+      type: currentType,
+      kind: currentTool === 'polygon' ? 'polygon' : 'path',
+      label: TYPE_CONFIG[currentType].label + (currentTool === 'polygon' ? '区域' : '路径'),
+      note: '',
+      points: drawingPoints.slice(),
+    };
+    markers.push(m);
+    drawingPoints = [];
+    selectedId = m.id;
+    updateMarkerList();
+    autoSave();
+    render();
+    setHint('已完成' + (currentTool === 'polygon' ? '多边形' : '路径') + ': ' + m.label);
+  }
+});
+
+cv.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if((currentTool === 'polygon' || currentTool === 'path') && drawingPoints.length >= 2){
+    const m = {
+      id: currentTool + '_' + Date.now(),
+      type: currentType,
+      kind: currentTool === 'polygon' ? 'polygon' : 'path',
+      label: TYPE_CONFIG[currentType].label + (currentTool === 'polygon' ? '区域' : '路径'),
+      note: '',
+      points: drawingPoints.slice(),
+    };
+    markers.push(m);
+    drawingPoints = [];
+    selectedId = m.id;
+    updateMarkerList();
+    autoSave();
+    render();
+  }
+});
+
+// 键盘
+document.addEventListener('keydown', e => {
+  if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if(e.key === 'Delete' || e.key === 'Backspace'){
+    if(selectedId){
+      markers = markers.filter(m => m.id !== selectedId);
+      selectedId = null;
+      updateMarkerList();
+      autoSave();
+      render();
+      setHint('已删除标注');
+    }
+  }
+  if(e.key === 'Escape'){
+    drawingPoints = [];
+    selectedId = null;
+    hideEditPopup();
+    render();
+    setHint('已取消');
+  }
+  if(e.key === 'Enter' && drawingPoints.length >= 2){
+    if(currentTool === 'polygon' || currentTool === 'path'){
+      const m = {
+        id: currentTool + '_' + Date.now(),
+        type: currentType,
+        kind: currentTool === 'polygon' ? 'polygon' : 'path',
+        label: TYPE_CONFIG[currentType].label + (currentTool === 'polygon' ? '区域' : '路径'),
+        note: '',
+        points: drawingPoints.slice(),
+      };
+      markers.push(m);
+      drawingPoints = [];
+      selectedId = m.id;
+      updateMarkerList();
+      autoSave();
+      render();
+    }
+  }
+});
+
+// ===== 碰撞检测 =====
+function hitTest(mx, my){
+  // 从后往前（上层优先）
+  for(let i = markers.length - 1; i >= 0; i--){
+    const m = markers[i];
+    const cfg = TYPE_CONFIG[m.type] || TYPE_CONFIG.custom;
+    if(m.kind === 'point'){
+      const dx = mx - px(m.x), dy = my - pz(m.z);
+      if(dx*dx + dy*dy < 15*15) return m;
+    } else {
+      // 多边形/矩形/路径：检测点是否在区域内或边上
+      const pts = m.points.map(p => [px(p[0]), pz(p[1])]);
+      if(m.kind === 'path'){
+        // 检测点到线段距离
+        for(let j = 0; j < pts.length - 1; j++){
+          if(distToSeg(mx, my, pts[j][0], pts[j][1], pts[j+1][0], pts[j+1][1]) < 6) return m;
+        }
+      } else {
+        // 点在多边形内
+        if(pointInPoly(mx, my, pts)) return m;
+        // 或在边上
+        for(let j = 0; j < pts.length; j++){
+          const j2 = (j+1) % pts.length;
+          if(distToSeg(mx, my, pts[j][0], pts[j][1], pts[j2][0], pts[j2][1]) < 6) return m;
+        }
+      }
+    }
+  }
+  return null;
+}
+function distToSeg(px, py, x1, y1, x2, y2){
+  const dx=x2-x1, dy=y2-y1; const len2=dx*dx+dy*dy;
+  if(len2===0) return Math.hypot(px-x1, py-y1);
+  let t = ((px-x1)*dx + (py-y1)*dy)/len2; t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px-(x1+t*dx), py-(y1+t*dy));
+}
+function pointInPoly(x, y, pts){
+  let inside = false;
+  for(let i = 0, j = pts.length - 1; i < pts.length; j = i++){
+    if((pts[i][1] > y) !== (pts[j][1] > y) && x < (pts[j][0] - pts[i][0]) * (y - pts[i][1]) / (pts[j][1] - pts[i][1]) + pts[i][0])
+      inside = !inside;
+  }
+  return inside;
+}
+
+// ===== 标注列表 =====
+function updateMarkerList(){
+  const list = document.getElementById('marker-list');
+  document.getElementById('marker-count').textContent = markers.length;
+  if(markers.length === 0){
+    list.innerHTML = '<div style="color:#666;font-size:12px;padding:8px">暂无标注。选择工具后在地图上点击添加。</div>';
+    return;
+  }
+  list.innerHTML = markers.map(m => {
+    const cfg = TYPE_CONFIG[m.type] || TYPE_CONFIG.custom;
+    const coords = m.kind === 'point' ? `(${m.x}, ${m.z})` : `${m.points.length}顶点`;
+    const noteHtml = m.note ? `<div class="mi-note">${escapeHtml(m.note)}</div>` : '';
+    return `<div class="marker-item ${m.id === selectedId ? 'selected' : ''}" data-id="${m.id}" style="border-left-color:${cfg.color}">
+      <div><span class="mi-label">${escapeHtml(m.label || '未命名')}</span>
+      <span class="mi-type" style="background:${cfg.color};color:#fff">${cfg.label}</span></div>
+      <div class="mi-coords">${m.kind} · ${coords}</div>
+      ${noteHtml}
+    </div>`;
+  }).join('');
+  // 点击选中
+  list.querySelectorAll('.marker-item').forEach(el => {
+    el.addEventListener('click', () => {
+      selectedId = el.dataset.id;
+      updateMarkerList();
+      render();
+    });
+  });
+}
+
+function escapeHtml(s){ return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+
+// ===== 编辑弹窗 =====
+function showEditPopup(m, clientX, clientY){
+  const popup = document.getElementById('edit-popup');
+  document.getElementById('edit-label').value = m.label || '';
+  document.getElementById('edit-note').value = m.note || '';
+  popup.style.left = Math.min(clientX + 10, window.innerWidth - 280) + 'px';
+  popup.style.top = Math.min(clientY + 10, window.innerHeight - 200) + 'px';
+  popup.classList.add('show');
+  popup.dataset.markerId = m.id;
+}
+function hideEditPopup(){
+  document.getElementById('edit-popup').classList.remove('show');
+}
+document.getElementById('edit-save').addEventListener('click', () => {
+  const popup = document.getElementById('edit-popup');
+  const id = popup.dataset.markerId;
+  const m = markers.find(m => m.id === id);
+  if(m){
+    m.label = document.getElementById('edit-label').value;
+    m.note = document.getElementById('edit-note').value;
+    updateMarkerList();
+    autoSave();
+    render();
+  }
+  hideEditPopup();
+});
+document.getElementById('edit-delete').addEventListener('click', () => {
+  const popup = document.getElementById('edit-popup');
+  const id = popup.dataset.markerId;
+  markers = markers.filter(m => m.id !== id);
+  selectedId = null;
+  updateMarkerList();
+  autoSave();
+  render();
+  hideEditPopup();
+});
+document.getElementById('edit-cancel').addEventListener('click', hideEditPopup);
+
+// ===== 工具切换 =====
+document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTool = btn.dataset.tool;
+    drawingPoints = [];
+    rectStart = null;
+    cv.style.cursor = currentTool === 'select' ? 'default' : 'crosshair';
+    const hints = {
+      select: '选择模式：点击标注编辑，拖拽移动',
+      point: '点标注：点击地图添加点',
+      polygon: '多边形：点击添加顶点，双击/右键/Enter完成',
+      rect: '矩形：按下拖拽到对角释放',
+      path: '路径线：依次点击路径点，双击结束',
+    };
+    setHint(hints[currentTool] || '');
+    render();
+  });
+});
+
+// 类型切换
+document.querySelectorAll('.type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentType = btn.dataset.type;
+  });
+});
+
+// ===== 导出/导入 =====
+function exportJSON(){
+  const data = {
+    version: 1,
+    map: 'kursk',
+    markers: markers.map(m => ({
+      id: m.id,
+      type: m.type,
+      kind: m.kind,
+      label: m.label || '',
+      note: m.note || '',
+      ...(m.kind === 'point' ? { x: m.x, z: m.z } : { points: m.points }),
+    })),
+  };
+  return JSON.stringify(data, null, 2);
+}
+
+document.getElementById('btn-export').addEventListener('click', () => {
+  document.getElementById('json-area').value = exportJSON();
+  setHint('已导出 ' + markers.length + ' 个标注到文本框');
+});
+document.getElementById('btn-do-export').addEventListener('click', () => {
+  document.getElementById('json-area').value = exportJSON();
+  setHint('已刷新导出');
+});
+document.getElementById('btn-copy').addEventListener('click', async () => {
+  const text = exportJSON();
+  try {
+    await navigator.clipboard.writeText(text);
+    setHint('已复制 ' + markers.length + ' 个标注到剪贴板！可直接粘贴给我');
+  } catch(e) {
+    document.getElementById('json-area').value = text;
+    document.getElementById('json-area').select();
+    document.execCommand('copy');
+    setHint('已复制到剪贴板（备用方式）');
+  }
+});
+
+document.getElementById('btn-import').addEventListener('click', () => {
+  document.getElementById('json-area').focus();
+  setHint('粘贴JSON到文本框，然后点"从文本导入"');
+});
+document.getElementById('btn-do-import').addEventListener('click', () => {
+  try {
+    const text = document.getElementById('json-area').value.trim();
+    if(!text) { setHint('请先粘贴JSON'); return; }
+    const data = JSON.parse(text);
+    if(data.markers && Array.isArray(data.markers)){
+      markers = data.markers.map(m => ({
+        id: m.id || 'imp_' + Date.now() + '_' + Math.random().toString(36).substr(2,5),
+        type: m.type || 'custom',
+        kind: m.kind || 'point',
+        label: m.label || '',
+        note: m.note || '',
+        ...(m.kind === 'point' || (!m.kind && m.x !== undefined) ? { x: m.x, z: m.z } : { points: m.points || [] }),
+      }));
+      updateMarkerList();
+      autoSave();
+      render();
+      setHint('已导入 ' + markers.length + ' 个标注');
+    } else {
+      setHint('JSON格式错误：缺少 markers 数组');
+    }
+  } catch(e) {
+    setHint('JSON解析失败: ' + e.message);
+  }
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if(confirm('确定清空所有标注？此操作不可撤销。')){
+    markers = [];
+    selectedId = null;
+    drawingPoints = [];
+    updateMarkerList();
+    autoSave();
+    render();
+    setHint('已清空所有标注');
+  }
+});
+document.getElementById('btn-delete-all').addEventListener('click', () => {
+  if(confirm('确定删除全部标注？')){
+    markers = [];
+    selectedId = null;
+    updateMarkerList();
+    autoSave();
+    render();
+    setHint('已删除全部标注');
+  }
+});
+
+document.getElementById('btn-undo').addEventListener('click', () => {
+  if(markers.length > 0){
+    const last = markers.pop();
+    if(selectedId === last.id) selectedId = null;
+    updateMarkerList();
+    autoSave();
+    render();
+    setHint('已撤销: ' + (last.label || '标注'));
+  } else {
+    setHint('没有可撤销的操作');
+  }
+});
+
+// ===== 自动保存 =====
+function autoSave(){
+  try {
+    localStorage.setItem(STORAGE_KEY, exportJSON());
+  } catch(e) {}
+}
+function loadSaved(){
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if(saved){
+      const data = JSON.parse(saved);
+      if(data.markers && Array.isArray(data.markers)){
+        markers = data.markers;
+        updateMarkerList();
+        setHint('已加载 ' + markers.length + ' 个保存的标注');
+      }
+    }
+  } catch(e) {}
+}
+
+// ===== 状态提示 =====
+function setHint(text){
+  document.getElementById('status-hint').textContent = text;
+}
+
+// ===== 初始化 =====
+loadSaved();
+render();
+updateMarkerList();
+</script>
+</body>
+</html>

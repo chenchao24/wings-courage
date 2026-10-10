@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>库尔斯克路网俯视图</title>
+<style>
+  body { margin:0; background:#1a1a1a; color:#e0d8c8; font-family:system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; padding:16px; }
+  h1 { font-size:18px; margin:0 0 4px; color:#f0e8d8; }
+  .sub { font-size:12px; color:#9a9080; margin-bottom:12px; }
+  canvas { background:#8a9038; border:1px solid #444; border-radius:4px; }
+  .legend { display:flex; gap:20px; margin-top:12px; font-size:13px; flex-wrap:wrap; justify-content:center; }
+  .lg { display:flex; align-items:center; gap:6px; }
+  .sw { width:28px; height:4px; border-radius:2px; }
+  .note { font-size:11px; color:#807868; margin-top:10px; max-width:900px; text-align:center; line-height:1.6; }
+</style>
+</head>
+<body>
+<h1>库尔斯克路网俯视图 · 1943 交通网络还原</h1>
+<div class="sub">基于真实地理：南北主干（奥廖尔—库尔斯克—别尔哥罗德）+ 乡间土路网络 + 田野小径 · 玩家★朝南(-Z)飞</div>
+<canvas id="c" width="920" height="820"></canvas>
+<div class="legend">
+  <div class="lg"><div class="sw" style="background:#d0ccc6;height:8px"></div>公路(18m 灰白)</div>
+  <div class="lg"><div class="sw" style="background:#b8b4ae;height:5px"></div>土路(5m 中灰白)</div>
+  <div class="lg"><div class="sw" style="background:#a09890;height:3px"></div>小路(2.5m 暗灰白)</div>
+  <div class="lg"><div class="sw" style="background:#eae6e0;height:8px;opacity:0.5"></div>浅色衔接(3-5m 路肩)</div>
+  <div class="lg"><div class="sw" style="background:#d0ccc6;height:8px;opacity:0.6"></div>路面色扩散带(5m α0.6)</div>
+  <div class="lg"><div class="sw" style="background:#d44;width:0;height:0;border:6px solid transparent;border-bottom:10px solid #d44;"></div>玩家(0,700,0)</div>
+</div>
+<div class="note">坐标单位:米 · 原点(0,0)=地图中心/玩家出生 · z+北/z-南/x+东/x-西 · 草原色背景模拟地形 · 道路灰白色+砂石质感+边缘虚化 · 路肩3-5m浅色衔接</div>
+
+<script>
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+// 坐标范围
+const XMIN=-16000, XMAX=19000, ZMIN=-16000, ZMAX=16000;
+const W=cv.width, H=cv.height;
+const PAD=40;
+const sx = (W-PAD*2)/(XMAX-XMIN);
+const sz = (H-PAD*2)/(ZMAX-ZMIN);
+const s = Math.min(sx, sz);
+// 原点画布坐标
+const ox = PAD + (0-XMIN)*s;
+const oy = PAD + (ZMAX-0)*s;
+function px(x){ return PAD + (x-XMIN)*s; }
+function pz(z){ return PAD + (ZMAX-z)*s; }
+
+// 草原底色（模拟地形）
+ctx.fillStyle = '#8a9038';
+ctx.fillRect(0,0,W,H);
+// 草原色斑（模拟地形颜色分区）
+const patches = [
+  {x:-8000,z:3000,r:5000,c:'#7a8030'},
+  {x:6000,z:-5000,r:6000,c:'#9a9840'},
+  {x:-5000,z:-8000,r:4500,c:'#86883a'},
+  {x:10000,z:8000,r:5500,c:'#7e8434'},
+  {x:3000,z:12000,r:5000,c:'#909438'},
+  {x:-12000,z:-10000,r:4000,c:'#80863a'},
+];
+patches.forEach(p=>{
+  const g=ctx.createRadialGradient(px(p.x),pz(p.z),0,px(p.x),pz(p.z),p.r*s);
+  g.addColorStop(0,p.c); g.addColorStop(1,'rgba(138,144,56,0)');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(px(p.x),pz(p.z),p.r*s,0,7); ctx.fill();
+});
+
+// 坐标网格（每 5000m）
+ctx.strokeStyle='rgba(60,50,30,0.15)'; ctx.lineWidth=1;
+for(let g=-15000; g<=18000; g+=5000){
+  ctx.beginPath(); ctx.moveTo(px(g),pz(ZMAX)); ctx.lineTo(px(g),pz(ZMIN)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px(XMIN),pz(g)); ctx.lineTo(px(XMAX),pz(g)); ctx.stroke();
+}
+// 坐标轴
+ctx.strokeStyle='rgba(40,30,20,0.4)'; ctx.lineWidth=1.5;
+ctx.beginPath(); ctx.moveTo(px(0),pz(ZMAX)); ctx.lineTo(px(0),pz(ZMIN)); ctx.stroke();
+ctx.beginPath(); ctx.moveTo(px(XMIN),pz(0)); ctx.lineTo(px(XMAX),pz(0)); ctx.stroke();
+// 刻度标注
+ctx.fillStyle='#3a3328'; ctx.font='10px monospace'; ctx.textAlign='center';
+for(let g=-15000; g<=18000; g+=10000){
+  if(g!==0) ctx.fillText((g/1000)+'km', px(g), pz(0)+14);
+}
+ctx.textAlign='right';
+for(let g=-15000; g<=15000; g+=10000){
+  if(g!==0) ctx.fillText((g/1000)+'km', px(0)-4, pz(g)+3);
+}
+// 方位标注
+ctx.fillStyle='#2a2218'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center';
+ctx.fillText('北 z+', px(0), pz(ZMAX)-18);
+ctx.fillText('南 z-', px(0), pz(ZMIN)+26);
+ctx.save(); ctx.translate(px(XMAX)+18, pz(0)); ctx.rotate(-Math.PI/2); ctx.fillText('东 x+', 0,0); ctx.restore();
+ctx.save(); ctx.translate(px(XMIN)-18, pz(0)); ctx.rotate(Math.PI/2); ctx.fillText('西 x-', 0,0); ctx.restore();
+
+// Catmull-Rom 插值
+function cmr(p0,p1,p2,p3,t){
+  const t2=t*t,t3=t2*t;
+  return {
+    x:0.5*((2*p1[0])+(-p0[0]+p2[0])*t+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3),
+    y:0.5*((2*p1[1])+(-p0[1]+p2[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3),
+  };
+}
+function drawRoad(pts, wpx, color){
+  ctx.strokeStyle=color; ctx.lineWidth=wpx; ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.beginPath();
+  // 端点延伸（首尾虚拟点）
+  const p0=[2*pts[0][0]-pts[1][0], 2*pts[0][1]-pts[1][1]];
+  const pn=[2*pts[pts.length-1][0]-pts[pts.length-2][0], 2*pts[pts.length-1][1]-pts[pts.length-2][1]];
+  const all=[p0,...pts,pn];
+  let first=true;
+  for(let i=1;i<all.length-2;i++){
+    for(let t=0;t<=1;t+=0.1){
+      const p=cmr(all[i-1],all[i],all[i+1],all[i+2],t);
+      const X=px(p.x), Y=pz(p.y);
+      if(first){ctx.moveTo(X,Y); first=false;} else ctx.lineTo(X,Y);
+    }
+  }
+  ctx.stroke();
+}
+
+// 道路数据（与 kurskRoads.js 一致）
+//   颜色：灰白系（干燥土路航拍色），无纹理有颗粒感
+//   路肩：浅色衔接 3-5m，边缘虚化
+const COL_H='#d0ccc6', COL_D='#b8b4ae', COL_T='#a09890';  // 路面色（灰白系）
+const COL_SH='#eae6e0';  // 路肩浅色衔接
+// 公路线宽(画布 px)：公路加倍 9→18m，路肩额外加宽
+const WH=9, WD=3.5, WT=1.8;  // 路面线宽
+const SH_H=3, SH_D=2.5, SH_T=2;  // 路肩额外线宽（浅色衔接带）
+
+// 带路肩+扩散带的道路绘制（先画扩散带，再画路肩，再画路面）
+function drawRoadWithShoulder(pts, wpx, color, shWpx){
+  // 1. 扩散带（路面色，半透明0.6，5m宽，边缘虚化）
+  ctx.globalAlpha = 0.35;
+  drawRoad(pts, wpx + shWpx*2 + 5, color);
+  ctx.globalAlpha = 0.6;
+  drawRoad(pts, wpx + shWpx*2 + 3, color);
+  // 2. 路肩浅色衔接（半透明）
+  ctx.globalAlpha = 0.5;
+  drawRoad(pts, wpx + shWpx*2, COL_SH);
+  ctx.globalAlpha = 1.0;
+  // 3. 路面（砂石灰白色）
+  drawRoad(pts, wpx, color);
+}
+
+// G1 南北主干（公路 18m）
+drawRoadWithShoulder([[3500,14000],[3200,10000],[3800,6000],[3500,3000],[3300,0],[3700,-3000],[3400,-6000],[3800,-10000],[3500,-14000]], WH, COL_H, SH_H);
+// G2 西支线（公路 14m）
+drawRoadWithShoulder([[3500,-2500],[0,-2800],[-4000,-2600],[-9000,-3000],[-14000,-2800]], WH*0.78, COL_H, SH_H);
+// G3 东支线（公路 14m）
+drawRoadWithShoulder([[3800,5000],[8000,5200],[13000,5500],[17000,5800]], WH*0.78, COL_H, SH_H);
+// 土路 D1-D6
+drawRoadWithShoulder([[3400,-6000],[0,-6500],[-4000,-7000],[-7500,-8000]], WD, COL_D, SH_D);
+drawRoadWithShoulder([[3500,2000],[0,2500],[-4500,2200],[-8500,2500]], WD, COL_D, SH_D);
+drawRoadWithShoulder([[3200,10000],[7000,10500],[11000,10000]], WD, COL_D, SH_D);
+drawRoadWithShoulder([[3800,-10000],[7000,-11000],[11000,-12500]], WD, COL_D, SH_D);
+drawRoadWithShoulder([[-4000,-2600],[-4200,-4500],[-4000,-7000]], WD*0.8, COL_D, SH_D);
+drawRoadWithShoulder([[8000,5200],[8200,8000],[7800,11000]], WD*0.8, COL_D, SH_D);
+// 小路 T1-T8
+drawRoadWithShoulder([[-4500,2200],[-5500,3000],[-6500,3500]], WT, COL_T, SH_T);
+drawRoadWithShoulder([[-4000,-7000],[-5000,-7500],[-5500,-8500]], WT, COL_T, SH_T);
+drawRoadWithShoulder([[3300,0],[2000,500],[800,800]], WT, COL_T, SH_T);
+drawRoadWithShoulder([[0,-2800],[-1000,-3500],[-2000,-4000]], WT, COL_T, SH_T);
+drawRoadWithShoulder([[3700,-3000],[5000,-2800],[6500,-3200]], WT, COL_T, SH_T);
+drawRoadWithShoulder([[3800,6000],[4500,6800],[4800,7600]], WT, COL_T, SH_T);
+drawRoadWithShoulder([[-9000,-3000],[-10000,-3800],[-10500,-4600]], WT, COL_T, SH_T);
+drawRoadWithShoulder([[13000,5500],[13500,6300],[13300,7200]], WT, COL_T, SH_T);
+
+// 道路标签
+ctx.fillStyle='#2a2218'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+function lbl(x,z,t){ ctx.fillText(t, px(x), pz(z)); }
+lbl(3500,14500,'G1 南北主干');
+lbl(-9000,-1800,'G2 西支线');
+lbl(13000,4600,'G3 东支线');
+lbl(-2000,-7500,'D1');
+lbl(-4000,1300,'D2');
+lbl(8000,10600,'D3');
+lbl(9000,-12000,'D4');
+lbl(-4800,-4800,'D5');
+lbl(8600,9000,'D6');
+
+// 玩家位置
+const px0=px(0), py0=pz(0);
+ctx.fillStyle='rgba(210,60,60,0.25)';
+ctx.beginPath(); ctx.arc(px0,py0,22,0,7); ctx.fill();
+ctx.fillStyle='#d44';
+ctx.beginPath();
+ctx.moveTo(px0, py0-12);
+ctx.lineTo(px0-7, py0+6);
+ctx.lineTo(px0+7, py0+6);
+ctx.closePath(); ctx.fill();
+ctx.fillStyle='#fff'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
+ctx.fillText('★玩家', px0, py0+20);
+
+// 玩家朝向（朝 -Z 南）
+ctx.strokeStyle='#d44'; ctx.lineWidth=2; ctx.setLineDash([4,3]);
+ctx.beginPath(); ctx.moveTo(px0,py0); ctx.lineTo(px0, py0+80); ctx.stroke();
+ctx.setLineDash([]);
+ctx.fillStyle='#d44'; ctx.font='10px sans-serif';
+ctx.fillText('朝向 -Z (战场)', px0+60, py0+55);
+</script>
+</body>
+</html>

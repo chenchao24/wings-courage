@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>敌机模型调试台 · 多模型</title>
+<style>
+  :root {
+    --panel: rgba(12, 18, 22, 0.88);
+    --line: rgba(120, 180, 210, 0.3);
+    --accent: #6fd0ff;
+    --warn: #ffb84d;
+    --fire: #ff5a4d;
+    --text: #d7e6ee;
+    --muted: #8aa0ad;
+    --prop: #6fff8a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #05080a; color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; font-size: 13px; }
+  #scene { display: block; width: 100vw; height: 100vh; }
+
+  /* 顶部 */
+  #topbar { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 11;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 22px;
+    padding: 6px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; max-width: 95vw; }
+  #topbar label { color: var(--muted); font-size: 12px; }
+  #topbar select { background: rgba(0,0,0,.4); color: var(--accent); border: 1px solid var(--line);
+    border-radius: 4px; padding: 4px 8px; font-size: 13px; cursor: pointer; }
+  #topbar button { background: rgba(111,208,255,.1); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--text); padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  #topbar button:hover { background: rgba(111,208,255,.2); }
+  #topbar button.prop { color: var(--prop); border-color: rgba(111,255,138,.4); }
+  #topbar button.go { background: var(--accent); color: #05080a; font-weight: 600; }
+  #topbar small { color: var(--muted); font-size: 11px; }
+
+  /* 左侧节点列表 */
+  #node-panel { position: fixed; top: 60px; left: 12px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    width: 320px; max-height: calc(100vh - 80px); display: flex; flex-direction: column; }
+  #node-panel .header { padding: 8px 12px; border-bottom: 1px solid var(--line);
+    color: var(--accent); font-size: 12px; letter-spacing: 1px; }
+  #node-panel .toolbar { padding: 6px 12px; border-bottom: 1px solid var(--line);
+    display: flex; gap: 6px; flex-wrap: wrap; }
+  #node-panel .toolbar button { background: rgba(255,255,255,.05); border: 1px solid var(--line);
+    border-radius: 3px; color: var(--muted); padding: 2px 8px; font-size: 11px; cursor: pointer; }
+  #node-panel .toolbar button:hover { background: rgba(111,208,255,.15); color: var(--accent); }
+  #node-list { flex: 1; overflow-y: auto; padding: 4px 0; max-height: calc(100vh - 200px); }
+  .node-row { padding: 4px 12px; display: flex; align-items: center; gap: 6px;
+    cursor: pointer; border-bottom: 1px solid rgba(120,180,210,.08); }
+  .node-row:hover { background: rgba(111,208,255,.08); }
+  .node-row.selected { background: rgba(111,208,255,.18); }
+  .node-row.prop { background: rgba(111,255,138,.10); }
+  .node-row.prop.selected { background: rgba(111,255,138,.20); }
+  .node-row input[type=checkbox] { margin: 0; cursor: pointer; }
+  .node-row .name { flex: 1; font-family: Consolas, monospace; font-size: 11px; color: var(--text); }
+  .node-row .info { color: var(--muted); font-size: 10px; font-family: Consolas, monospace; }
+  .node-row .tag { font-size: 9px; padding: 1px 4px; border-radius: 2px; }
+  .tag.prop { background: var(--prop); color: #05080a; }
+  .tag.gear { background: #ff5a4d; color: #fff; }
+
+  /* 右侧面板 */
+  #panel { position: fixed; top: 60px; right: 14px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; width: 360px; max-height: calc(100vh - 80px); overflow: auto;
+    font-size: 12px; backdrop-filter: blur(6px); }
+  #panel h4 { color: var(--accent); letter-spacing: 1px; margin: 14px 0 6px; font-size: 12px; }
+  #panel h4:first-child { margin-top: 0; }
+  .ctrl { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .ctrl label { width: 64px; color: var(--muted); }
+  .ctrl input[type=range] { flex: 1; min-width: 60px; }
+  .ctrl .val { width: 60px; text-align: right; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .ctrl input[type=number].val {
+    background: rgba(0,0,0,.4); border: 1px solid var(--line); border-radius: 3px;
+    padding: 2px 4px; font-size: 12px; font-family: Consolas, monospace;
+  }
+  .ctrl input[type=number].val:focus { outline: none; border-color: var(--accent); }
+  .ctrl select { flex: 1; background: rgba(0,0,0,.4); color: var(--accent);
+    border: 1px solid var(--line); border-radius: 3px; padding: 2px 6px; font-size: 12px; }
+  .muz-group { border: 1px solid var(--line); border-radius: 6px; padding: 8px; margin: 6px 0; }
+  .muz-group .muz-title { color: var(--warn); font-size: 11px; margin-bottom: 4px; }
+  .muz-group .muz-actions { display: flex; gap: 4px; margin-top: 4px; }
+  .muz-group .muz-actions button { font-size: 10px; padding: 2px 6px; }
+  button { background: rgba(111,208,255,.1); border: 1px solid var(--line); border-radius: 4px;
+    color: var(--text); padding: 4px 10px; font-size: 11px; cursor: pointer; margin: 2px; }
+  button:hover { background: rgba(111,208,255,.2); }
+  button.active { background: var(--accent); color: #05080a; font-weight: 600; }
+  button.prop { color: var(--prop); border-color: rgba(111,255,138,.4); }
+  button.gear { color: #ff7a6a; border-color: rgba(255,90,77,.4); }
+  button.go { background: var(--accent); color: #05080a; font-weight: 600; }
+  .btn-row { display: flex; gap: 4px; flex-wrap: wrap; margin: 4px 0; }
+  #out-pre {
+    background: rgba(0,0,0,.4); border: 1px solid var(--line); border-radius: 4px;
+    padding: 8px; font: 11px Consolas, monospace; color: #b8e0ff; white-space: pre-wrap;
+    margin-top: 6px; max-height: 220px; overflow: auto;
+  }
+
+  /* 加载 */
+  #loader {
+    position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 40%, #122029, #05080a 70%);
+    transition: opacity .6s ease;
+  }
+  #loader.hide { opacity: 0; pointer-events: none; }
+  #loader .title { font-size: 20px; letter-spacing: 4px; color: var(--accent); margin-bottom: 18px; }
+  .bar { width: 300px; max-width: 70vw; height: 6px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #6fd0ff, #2a8fd0); transition: width .2s; }
+  #loader .pct { margin-top: 12px; font-size: 12px; color: var(--muted); }
+  #loader .err { margin-top: 16px; color: var(--fire); font-size: 12px; max-width: 80vw; text-align: center; }
+
+  /* 提示 */
+  #hint { position: fixed; bottom: 12px; left: 12px; z-index: 10; max-width: 320px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; font-size: 11px; color: var(--muted); line-height: 1.5; }
+  #hint b { color: var(--accent); }
+  #hint .prop { color: var(--prop); }
+  #hint .warn { color: var(--warn); }
+</style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <div id="topbar">
+    <label>模型：</label>
+    <select id="model-select">
+      <option value="/model/he111.glb">He 111（德国轰炸机）</option>
+      <option value="/model/ju88.glb">Ju 88（德国轰炸机）</option>
+      <option value="/model/spitfire.glb">Spitfire（喷火）</option>
+      <option value="/model/yak9.glb">Yak-9（参考）</option>
+      <option value="/model/yak1.glb">Yak-1</option>
+      <option value="/model/bf109_opt.glb">Bf 109 E-4（玩家基准）</option>
+    </select>
+    <small id="topbar-sub">载入中…</small>
+    <button class="prop" id="btn-mark-prop">标记选中为螺旋桨</button>
+    <button id="btn-clear-prop">清空螺旋桨标记</button>
+    <button class="gear" id="btn-mark-gear">标记选中为起落架</button>
+    <button id="btn-clear-gear">清空起落架标记</button>
+  </div>
+
+  <div id="node-panel">
+    <div class="header">节点列表（按 Y 升序，点击高亮）</div>
+    <div class="toolbar">
+      <button id="btn-sort-y">按 Y 排序</button>
+      <button id="btn-sort-name">按名称</button>
+      <button id="btn-show-all">全显</button>
+      <button id="btn-hide-low">隐藏 Y&lt;0.3</button>
+    </div>
+    <div id="node-list"></div>
+  </div>
+
+  <div id="panel">
+    <h4>朝向校准</h4>
+    <div class="ctrl"><label>偏航 Yaw</label><input type="range" id="r-yaw" min="-180" max="360" step="0.5" value="0"><input type="number" id="r-yaw-v" min="-180" max="360" step="0.5" value="0" class="val"></div>
+    <div class="ctrl"><label>俯仰 Pitch</label><input type="range" id="r-pitch" min="-30" max="30" step="0.5" value="0"><input type="number" id="r-pitch-v" min="-30" max="30" step="0.5" value="0" class="val"></div>
+    <div class="ctrl"><label>滚转 Roll</label><input type="range" id="r-roll" min="-30" max="30" step="0.5" value="0"><input type="number" id="r-roll-v" min="-30" max="30" step="0.5" value="0" class="val"></div>
+    <div class="ctrl"><label>缩放 Scale</label><input type="range" id="r-scale" min="1" max="12" step="0.05" value="4.08"><input type="number" id="r-scale-v" min="1" max="12" step="0.05" value="4.08" class="val"></div>
+    <h4 style="margin-top:10px;color:var(--warn);font-size:11px">中心偏移（飞机对齐坐标原点）</h4>
+    <div class="ctrl"><label>中心 X</label><input type="range" id="r-cx" min="-6" max="6" step="0.05" value="0"><input type="number" id="r-cx-v" min="-6" max="6" step="0.05" value="0" class="val"></div>
+    <div class="ctrl"><label>中心 Y</label><input type="range" id="r-cy" min="-6" max="6" step="0.05" value="0"><input type="number" id="r-cy-v" min="-6" max="6" step="0.05" value="0" class="val"></div>
+    <div class="ctrl"><label>中心 Z</label><input type="range" id="r-cz" min="-6" max="6" step="0.05" value="0"><input type="number" id="r-cz-v" min="-6" max="6" step="0.05" value="0" class="val"></div>
+    <div class="btn-row">
+      <button id="btn-auto-yaw">自动偏航（螺旋桨质心）</button>
+      <button id="btn-reset-orient">重置朝向</button>
+    </div>
+
+    <h4>参考飞机对比</h4>
+    <div class="ctrl">
+      <label>参考机</label>
+      <select id="ref-select">
+        <option value="">无</option>
+        <option value="/model/bf109_opt.glb">Bf 109 E-4（玩家基准）</option>
+        <option value="/model/yak9.glb">Yak-9</option>
+      </select>
+    </div>
+    <div class="ctrl"><label>透明度</label><input type="range" id="ref-opacity" min="0.1" max="1" step="0.05" value="0.35"><input type="number" id="ref-opacity-v" min="0.1" max="1" step="0.05" value="0.35" class="val"></div>
+
+    <h4>枪口位置与方向（body frame，机头=-Z）</h4>
+    <div class="ctrl">
+      <label>枪口预设</label>
+      <select id="muz-preset">
+        <option value="he111">He 111（1前+3炮塔）</option>
+        <option value="ju88">Ju 88（1前+3炮塔）</option>
+        <option value="spitfire">Spitfire 8×.303（4左+4右机翼）</option>
+        <option value="yak9">Yak-9 4挺（2机翼+2机头）</option>
+        <option value="custom">自定义</option>
+      </select>
+    </div>
+    <div id="muz-list"></div>
+    <div class="btn-row">
+      <button id="btn-markers" class="active">枪口标记</button>
+      <button id="btn-rays" class="active">弹道射线</button>
+    </div>
+
+    <h4>相机视角</h4>
+    <div class="btn-row">
+      <button id="btn-cam-chase" class="active">追尾</button>
+      <button id="btn-cam-side">侧面</button>
+      <button id="btn-cam-top">俯视</button>
+      <button id="btn-cam-front">正面</button>
+    </div>
+
+    <h4>参数输出（复制到 enemy.js MODEL_CONFIGS）</h4>
+    <pre id="out-pre"></pre>
+    <div class="btn-row">
+      <button id="btn-copy" class="go">复制参数</button>
+      <button id="btn-screenshot">截图</button>
+    </div>
+  </div>
+
+  <div id="hint">
+    <b>使用说明</b><br>
+    1. 顶部切换模型；右侧调朝向（实时应用）<br>
+    2. <span class="prop">绿色标签 = 机头方向(-Z)</span>，飞机机头应正对绿标签<br>
+    3. 红色标签=机尾(+Z)；黄色=左/右翼；蓝色=上方(+Y)<br>
+    4. 左侧节点列表点击高亮；<span class="prop">标记螺旋桨</span> 按钮标记桨叶节点<br>
+    5. "自动偏航"用 <span class="prop">propNodes</span>（标记优先）或 PROP_KEYWORDS 算质心<br>
+    6. 枪口预设选 He 111/Ju 88 自动加载自卫炮塔；每枪含 Yaw/Pitch 调方向<br>
+    7. <span class="warn">Yaw=0/Pitch=0</span> 朝前；Yaw=180 朝后；Pitch=90 朝上<br>
+    8. 参考飞机叠加对比朝向；调好点 <span class="warn">复制参数</span>
+  </div>
+
+  <div id="loader">
+    <div class="title">敌机模型调试台</div>
+    <div class="bar"><i id="loader-fill"></i></div>
+    <div class="pct" id="loader-pct">0%</div>
+    <div class="err" id="loader-err"></div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/node_modules/three/build/three.module.js",
+      "three/addons/": "/node_modules/three/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="./js/tune_enemy.js"></script>
+</body>
+</html>

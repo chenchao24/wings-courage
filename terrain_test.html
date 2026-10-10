@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>地形测试页 · 库尔斯克</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+  #scene { display: block; width: 100%; height: 100%; }
+
+  /* 左上角 HUD：速度/高度/位置/视角 */
+  #hud {
+    position: fixed; top: 12px; left: 12px; z-index: 10;
+    font-family: 'Consolas', 'Menlo', monospace; font-size: 13px; line-height: 1.7;
+    color: #f4e8c8; text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
+    pointer-events: none; user-select: none;
+    background: rgba(20, 16, 10, 0.35); padding: 8px 12px; border-radius: 6px;
+    border: 1px solid rgba(200, 170, 120, 0.25);
+  }
+  #hud .label { color: #b8a888; }
+  #hud .val { color: #fff8e0; }
+  #hud .mode { color: #ffd060; font-weight: bold; }
+
+  /* 右上角控制提示 */
+  #hint {
+    position: fixed; top: 12px; right: 12px; z-index: 10;
+    font-family: 'Consolas', 'Menlo', monospace; font-size: 12px; line-height: 1.8;
+    color: #c8b890; text-shadow: 0 0 4px rgba(0,0,0,0.9);
+    pointer-events: none; user-select: none;
+    background: rgba(20, 16, 10, 0.35); padding: 8px 12px; border-radius: 6px;
+    border: 1px solid rgba(200, 170, 120, 0.25);
+    text-align: right;
+  }
+  #hint kbd {
+    display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 2px;
+    background: rgba(200, 170, 120, 0.2); border: 1px solid rgba(200, 170, 120, 0.4);
+    border-radius: 3px; color: #fff8e0; font-size: 11px; text-align: center;
+  }
+
+  /* 底部加载/状态条 */
+  #status {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
+    font-family: 'Consolas', 'Menlo', monospace; font-size: 13px;
+    color: #ffd060; text-shadow: 0 0 6px rgba(0,0,0,0.9);
+    pointer-events: none; user-select: none;
+    background: rgba(20, 16, 10, 0.5); padding: 6px 16px; border-radius: 16px;
+    border: 1px solid rgba(200, 170, 120, 0.3);
+  }
+</style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <div id="hud">
+    <div><span class="label">视角</span> <span class="mode" id="hud-mode">追尾</span></div>
+    <div><span class="label">速度</span> <span class="val" id="hud-speed">0</span> km/h</div>
+    <div><span class="label">高度</span> <span class="val" id="hud-alt">0</span> m · <span class="label">AGL</span> <span class="val" id="hud-agl">0</span> m</div>
+    <div><span class="label">坐标</span> <span class="val" id="hud-pos">0, 0</span></div>
+  </div>
+
+  <div id="hint">
+    <div><kbd>W</kbd><kbd>S</kbd> 俯仰 <kbd>A</kbd><kbd>D</kbd> 滚转 <kbd>Q</kbd><kbd>E</kbd> 偏航</div>
+    <div><kbd>Shift</kbd>/<kbd>Ctrl</kbd> 油门 <kbd>C</kbd> 切换视角 <kbd>R</kbd> 重置位置</div>
+  </div>
+
+  <div id="status">加载中…</div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/node_modules/three/build/three.module.js",
+      "three/addons/": "/node_modules/three/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { createEnvironment, disposeEnvironment } from './js/environment.js';
+    import { Clouds } from './js/clouds.js';
+    import { KurskRoads } from './js/kurskRoads.js';
+    import { Aircraft } from './js/aircraft.js';
+    import { Controls } from './js/controls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import kurskLevel from './js/config/levels/level_03_kursk.js';
+
+    // ════════════════════════════════════════════════════════════
+    // 地形测试页：复用第三关（库尔斯克）地形/环境/玩家，无敌机/波次/对话/教学。
+    // 用于独立验证地形效果（颜色过渡/丘陵密度/颗粒感/尺寸），满意后合入第三关。
+    // ════════════════════════════════════════════════════════════
+
+    // ---------- renderer / scene / camera（参数对齐 AppShell.boot）----------
+    const canvas = document.getElementById('scene');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.5, 50000);
+    camera.position.set(0, 720, 30);
+    camera.lookAt(0, 700, -100);
+
+    // ---------- 环境 + 云层（用第三关 environment/clouds 配置）----------
+    const env = createEnvironment(scene, renderer, kurskLevel.environment);
+
+    // ===== 清除地面所有房屋/树林/坦克等地标（准备重新制作）=====
+    // buildings（村庄+桦树林+耕田地标）和 battlefield（坦克残骸/炮阵地/战壕/高炮阵地）
+    // 全部 dispose 移除，只保留地形+天空+海洋+云，后续重新设计地面物件
+    if (env.buildings) { env.buildings.dispose(scene); }
+    if (env.battlefield) { env.battlefield.dispose(scene); env.battlefield = null; }
+    env.obstacles = [];
+    env.obstacleCenters = [];
+
+    // ===== 库尔斯克路网（基于 1943 真实交通网络还原）=====
+    // 三级路网：公路（南北主干+东西支线）/ 土路（乡间弯曲路）/ 小路（田野小径）
+    // 颜色写实灰土色系，与草原地形融合
+    const roads = new KurskRoads(env.terrain);
+    scene.add(roads.group);
+
+    const clouds = new Clouds(scene, kurskLevel.clouds || { count: 55 });
+
+    // ===== 雾测试覆盖（满意后写回 level_03_kursk.js）=====
+    // density: 原 0.00018 太浓，降到 0.00009（比 britain 0.00012 更通透）
+    // color: 中性灰白 0xe0e0e0（大气雾白）。
+    //   0xe8c8a0(暖橙) 太黄；0xc8e0f4(浅蓝白) 太蓝；中性灰白最接近真实大气雾的"白茫茫"感，
+    //   且不与天空底部暖橙霞光冲突（地平线冷暖过渡自然）。
+    //   底盘 apron 读 scene.fog.color，自动跟随，apron=fog 同色→底盘边缘不可见。
+    const FOG_DENSITY_TEST = 0.00009;
+    const FOG_COLOR_TEST = 0xe0e0e0;
+    if (scene.fog) {
+      scene.fog.density = FOG_DENSITY_TEST;
+      scene.fog.color.setHex(FOG_COLOR_TEST);
+    }
+
+    // ---------- 地平线延伸底盘（消除高空可见的方形地形边角）----------
+    // 问题：48000m 方形地形在高空能看到四方块边角，地形边缘外直接露天空球，违和。
+    // 方案：跟随相机 XZ 的超大圆盘（半径45000，夹在天空球40000与far平面50000之间），
+    //   填满地形边缘到天空球之间的缝隙。圆盘是圆形（无方角）且永远跟随相机，
+    //   无论飞多高飞多远都只见地平线。远端被场景雾完全吞没（fog color），与雾化地形边缘无缝衔接。
+    //   y=-40 低于地形最低点38m（避免与地形面太近 z-fighting 穿透），近处被地形遮挡不可见；24km边界台阶被雾吞。
+    const APRON_RADIUS = 45000;
+    const apronGeo = new THREE.CircleGeometry(APRON_RADIUS, 96);
+    apronGeo.rotateX(-Math.PI / 2);  // 水平铺开
+    const apronMat = new THREE.MeshBasicMaterial({
+      color: scene.fog ? scene.fog.color.getHex() : 0xe8c8a0,  // 读 scene.fog.color（跟随测试覆盖），与天/地/雾同色
+      fog: true,                  // 受场景雾影响，远端淡入雾色（与地形边缘雾化一致）
+    });
+    const apron = new THREE.Mesh(apronGeo, apronMat);
+    apron.position.set(0, -40, 0);  // 低于地形最低点38m，避免 y=-2 与地形面太近的 z-fighting 穿透；24km边界台阶被雾吞不可见
+    scene.add(apron);
+
+    // ---------- 玩家飞机（复用 GameRuntime.start 的 playerConfig 注入逻辑）----------
+    const player = new Aircraft(scene, renderer);
+    player.autoRespawn = false;
+    player.isPlayer = true;
+
+    const pc = kurskLevel.playerConfig;
+    if (pc) {
+      // 校准（load 内 _normalize/_autoOrient/_applyCalibration 读取）
+      if (pc.autoOrient !== undefined) player.autoOrient = pc.autoOrient;
+      if (pc.yawOffset !== undefined) player.yawOffset = pc.yawOffset;
+      if (pc.userScale !== undefined) player.userScale = pc.userScale;
+      if (pc.centerOffset) player.centerOffset = pc.centerOffset.slice();
+      if (pc.propNodes) player._propNodes = pc.propNodes.slice();
+      if (pc.hideGear !== undefined) player._hideGear = pc.hideGear;
+      if (pc.hideGearNodes) player._hideGearNodes = pc.hideGearNodes.slice();
+      if (pc.glassNodes) player._glassNodes = pc.glassNodes.slice();
+      // 螺旋桨视觉（load 内 _applyPropNodes/_setupProceduralProp 用）
+      if (pc.propBlurDisc !== undefined) player._propBlurDisc = pc.propBlurDisc;
+      if (pc.propSpinSpeed !== undefined) player._propSpinSpeed = pc.propSpinSpeed;
+      if (pc.propOpacity !== undefined) player._propOpacity = pc.propOpacity;
+      if (pc.propBlurStrength !== undefined) player._propBlurStrength = pc.propBlurStrength;
+      if (pc.propBlurStyle !== undefined) player._propBlurStyle = pc.propBlurStyle;
+      // 程序化螺旋桨
+      if (pc.propProcedural !== undefined) player._propProcedural = pc.propProcedural;
+      if (pc.propHubOffset) player._propHubOffset = pc.propHubOffset.slice();
+      if (pc.propRadius !== undefined) player._propRadius = pc.propRadius;
+      if (pc.propBladeCount !== undefined) player._propBladeCount = pc.propBladeCount;
+      if (pc.propBladeChord !== undefined) player._propBladeChord = pc.propBladeChord;
+      if (pc.propBladeTwist !== undefined) player._propBladeTwist = pc.propBladeTwist;
+      // 静态桨叶透明切割（shader discard）
+      if (pc.propCut) player._propCut = { ...pc.propCut };
+      // 座舱内部光源
+      if (pc.cockpitLight) player._cockpitLight = { ...pc.cockpitLight };
+      // 飞行物理（load 后生效）
+      if (pc.maxSpeed !== undefined) player.maxSpeed = pc.maxSpeed;
+      if (pc.minSpeed !== undefined) player.minSpeed = pc.minSpeed;
+      if (pc.cruiseSpeed !== undefined) player.cruiseSpeed = pc.cruiseSpeed;
+      if (pc.pitchMax !== undefined) player.pitchMax = pc.pitchMax;
+      if (pc.pitchResp !== undefined) player.pitchResp = pc.pitchResp;
+      if (pc.rollMax !== undefined) player.rollMax = pc.rollMax;
+      if (pc.rollResp !== undefined) player.rollResp = pc.rollResp;
+      if (pc.yawMax !== undefined) player.yawMax = pc.yawMax;
+      if (pc.yawResp !== undefined) player.yawResp = pc.yawResp;
+      if (pc.gravity !== undefined) player.gravity = pc.gravity;
+      if (pc.liftK !== undefined) player.liftK = pc.liftK;
+      if (pc.diveAccel !== undefined) player.diveAccel = pc.diveAccel;
+      if (pc.stallThreshold !== undefined) player.stallThreshold = pc.stallThreshold;
+    }
+
+    // 座舱/相机参数（关卡级覆盖，默认走 Bf 109 常量；FW190 座舱位置不同）
+    const COCKPIT_CFG = { x: 0.00, y: 1.65, z: -0.70, lookDist: 80 };
+    const CAM_OFFSETS = { chase: new THREE.Vector3(0, 3.4, 12.5), top: new THREE.Vector3(0, 16, 0.5) };
+    let AIM_LIFT_COCKPIT = 0.12;
+    const cockpitCfg = { ...COCKPIT_CFG };
+    const camOffsets = { chase: CAM_OFFSETS.chase.clone(), top: CAM_OFFSETS.top.clone() };
+    if (pc?.cockpit) {
+      const ck = pc.cockpit;
+      if (ck.x !== undefined) cockpitCfg.x = ck.x;
+      if (ck.y !== undefined) cockpitCfg.y = ck.y;
+      if (ck.z !== undefined) cockpitCfg.z = ck.z;
+      if (ck.lookDist !== undefined) cockpitCfg.lookDist = ck.lookDist;
+      if (ck.aimLift !== undefined) AIM_LIFT_COCKPIT = ck.aimLift;
+      if (ck.chase) {
+        if (ck.chase.x !== undefined) camOffsets.chase.x = ck.chase.x;
+        if (ck.chase.y !== undefined) camOffsets.chase.y = ck.chase.y;
+        if (ck.chase.z !== undefined) camOffsets.chase.z = ck.chase.z;
+      }
+    }
+
+    player.setTerrain(env.terrain);
+    player.setObstacles(env.obstacles);
+
+    // ---------- 输入 ----------
+    const controls = new Controls();
+
+    // ---------- 相机状态 ----------
+    // C 键循环：追尾(chase) → 座舱(cockpit) → 俯瞰(top) → 追尾
+    const CAM_MODES = ['chase', 'cockpit', 'top'];
+    const CAM_LABELS = { chase: '追尾', cockpit: '座舱', top: '俯瞰' };
+    let camMode = 'chase';
+    let camInited = false;
+
+    // 临时向量（复用，避免每帧 new）
+    const _camOff = new THREE.Vector3();
+    const _lookAt = new THREE.Vector3();
+    const _fwd = new THREE.Vector3();
+
+    // ════════════════════════════════════════════════════════════
+    // 地面模型预览：加载所有优化后的坦克/车辆/残骸模型（独立于飞机加载）
+    //   缩放：按包围盒最长维统一缩放到 2.8 单位（对应真实约 7.7m，中坦尺寸）
+    //   排列：7列×3行网格，间距 25m，中心在玩家前方 400m 地面
+    // ════════════════════════════════════════════════════════════
+    const groundModelGroup = new THREE.Group();
+    groundModelGroup.name = 'ground-models-preview';
+    scene.add(groundModelGroup);
+
+    // 真实坦克尺寸（含炮管总长，米）→ 游戏单位 = realLen × 0.3629（Bf109 翼展 9.92m = 3.6 单位）
+    // paint: 'german'=德军暗黄+绿迷彩 | 'soviet'=苏军绿 | 'wreck'=铁锈烧毁色
+    const GROUND_MODELS = [
+      // 德国坦克（第1行）— 德军暗黄+橄榄绿迷彩（1943 库尔斯克标准涂装）
+      { path: '/model/ground_optimized/gtank/gtank1.glb',                            label: 'Pz II',       realLen: 4.81, paint: 'german' },
+      { path: '/model/ground_optimized/gtank/gtank3.glb',                            label: 'Pz III',      realLen: 6.41, paint: 'german' },
+      { path: '/model/ground_optimized/gtank/low-poly_panther_german_tank.glb',      label: 'Panther',     realLen: 8.66, paint: 'german' },
+      { path: '/model/ground_optimized/gtank/low-poly_pz_ivh_german_tank.glb',       label: 'Pz IV H',     realLen: 7.02, paint: 'german' },
+      { path: '/model/ground_optimized/gtank/low-poly_tiger_german_tank.glb',        label: 'Tiger I',     realLen: 8.45, paint: 'german' },
+      { path: '/model/ground_optimized/gtank/medium_tank_ii.glb',                    label: 'Pz IV(med)',  realLen: 7.02, paint: 'german' },
+      { path: '/model/ground_optimized/gtank/tiger_tank_and_crew.glb',               label: 'Tiger+Crew',  realLen: 8.45, paint: 'german' },
+      // 苏联坦克（第2行）— 苏军 4BO 橄榄绿
+      { path: '/model/ground_optimized/gtank/low-poly_kv-1_soviet_tank.glb',         label: 'KV-1',        realLen: 6.68, paint: 'soviet' },
+      { path: '/model/ground_optimized/gtank/low-poly_kv-2_soviet_tank.glb',         label: 'KV-2',        realLen: 6.67, paint: 'soviet' },
+      { path: '/model/ground_optimized/stank/low-poly_t-34_soviet_tank.glb',         label: 'T-34',        realLen: 7.64, paint: 'soviet' },
+      { path: '/model/ground_optimized/stank/low-poly_t-34-85_soviet_tank.glb',      label: 'T-34-85',     realLen: 8.15, paint: 'soviet' },
+      { path: '/model/ground_optimized/stank/low-poly_bt-7_soviet_tank.glb',         label: 'BT-7',        realLen: 5.66, paint: 'soviet' },
+      { path: '/model/ground_optimized/stank/low-poly_su-85_soviet_tank.glb',        label: 'SU-85',       realLen: 8.13, paint: 'soviet' },
+      { path: '/model/ground_optimized/stank/t-34-stank.glb',                        label: 'T-34(stank)', realLen: 7.64, paint: 'soviet' },
+      // 卡车+残骸（第3行）— 卡车苏军绿，残骸铁锈烧毁色
+      { path: '/model/ground_optimized/stank/truck.glb',                             label: 'Truck',       realLen: 6.06, paint: 'soviet' },
+      { path: '/model/ground_optimized/crush/-26_sd_crash.glb',                      label: 'T-26残',      realLen: 4.88, paint: 'wreck' },
+      { path: '/model/ground_optimized/crush/-28_sd_crash.glb',                      label: 'T-28残',      realLen: 7.37, paint: 'wreck' },
+      { path: '/model/ground_optimized/crush/-152_sd_crash.glb',                     label: 'ISU-152残',   realLen: 9.18, paint: 'wreck' },
+      { path: '/model/ground_optimized/crush/airplane_crash.glb',                    label: '飞机残骸',    realLen: 10.0, paint: 'wreck' },
+      { path: '/model/ground_optimized/crush/kv_sd_crash.glb',                       label: 'KV残',        realLen: 6.68, paint: 'wreck' },
+      { path: '/model/ground_optimized/crush/t-50-2_sd_crash.glb',                   label: 'T-50残',      realLen: 5.31, paint: 'wreck' },
+    ];
+
+    // 程序化涂装纹理生成
+    function makePaintTexture(type) {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 256;
+      const ctx = c.getContext('2d');
+      if (type === 'german') {
+        // 德军暗黄底 RAL 7028 + 橄榄绿 RAL 6003 迷彩 + 红棕 RAL 8017
+        ctx.fillStyle = '#9c8c4a'; ctx.fillRect(0, 0, 256, 256);
+        ctx.fillStyle = '#4b5320';
+        for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.ellipse(Math.random()*256, Math.random()*256, 30+Math.random()*40, 15+Math.random()*25, Math.random()*Math.PI, 0, Math.PI*2); ctx.fill(); }
+        ctx.fillStyle = '#5a3a28';
+        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(Math.random()*256, Math.random()*256, 20+Math.random()*30, 10+Math.random()*20, Math.random()*Math.PI, 0, Math.PI*2); ctx.fill(); }
+      } else if (type === 'soviet') {
+        // 苏军 4BO 橄榄绿底 + 深绿斑驳
+        ctx.fillStyle = '#3d4a2a'; ctx.fillRect(0, 0, 256, 256);
+        ctx.fillStyle = '#2a3520';
+        for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.ellipse(Math.random()*256, Math.random()*256, 25+Math.random()*35, 15+Math.random()*20, Math.random()*Math.PI, 0, Math.PI*2); ctx.fill(); }
+        ctx.fillStyle = '#4a5c34';
+        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(Math.random()*256, Math.random()*256, 20+Math.random()*25, 12+Math.random()*15, Math.random()*Math.PI, 0, Math.PI*2); ctx.fill(); }
+      } else { // wreck
+        // 烧毁铁锈：炭黑底 + 铁锈红棕斑 + 灰烬
+        ctx.fillStyle = '#2a2018'; ctx.fillRect(0, 0, 256, 256);
+        ctx.fillStyle = '#6b3a1a';  // 铁锈红棕
+        for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.ellipse(Math.random()*256, Math.random()*256, 20+Math.random()*35, 12+Math.random()*20, Math.random()*Math.PI, 0, Math.PI*2); ctx.fill(); }
+        ctx.fillStyle = '#8a4a20';  // 亮锈橙
+        for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.ellipse(Math.random()*256, Math.random()*256, 15+Math.random()*20, 8+Math.random()*12, Math.random()*Math.PI, 0, Math.PI*2); ctx.fill(); }
+        ctx.fillStyle = '#1a1510';  // 烧焦黑
+        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(Math.random()*256, Math.random()*256, 25+Math.random()*30, 15+Math.random()*20, Math.random()*Math.PI, 0, Math.PI*2); ctx.fill(); }
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    // 独立 async 函数，直接在模块顶层调用（不依赖飞机加载）
+    (async () => {
+      const loader = new GLTFLoader();
+      const SCALE_FACTOR = 0.3629;   // 1m 真实 = 0.3629 游戏单位（Bf109 翼展 9.92m → 3.6 单位）
+      const COLS = 7;
+      const SPACING = 22;
+      const CENTER_Z = -400;
+      const CENTER_X = 0;
+      // 预生成三种涂装纹理（共享，避免重复创建）
+      const paintTexs = { german: makePaintTexture('german'), soviet: makePaintTexture('soviet'), wreck: makePaintTexture('wreck') };
+      let loaded = 0;
+      console.log('[ground-model] 开始加载 %d 个地面模型...', GROUND_MODELS.length);
+      for (let i = 0; i < GROUND_MODELS.length; i++) {
+        const cfg = GROUND_MODELS[i];
+        const col = i % COLS;
+        const row = Math.floor(i / COLS);
+        const x = CENTER_X + (col - (COLS - 1) / 2) * SPACING;
+        const z = CENTER_Z - row * SPACING;
+        try {
+          const gltf = await loader.loadAsync(cfg.path);
+          const obj = gltf.scene;
+          const box = new THREE.Box3().setFromObject(obj);
+          const size = new THREE.Vector3();
+          box.getSize(size);
+          const maxDim = Math.max(size.x, size.y, size.z) || 1;
+          const scale = (cfg.realLen * SCALE_FACTOR) / maxDim;
+          obj.scale.setScalar(scale);
+          // 按阵营替换涂装材质
+          if (cfg.paint && paintTexs[cfg.paint]) {
+            obj.traverse(o => {
+              if (o.isMesh) o.material = new THREE.MeshLambertMaterial({ map: paintTexs[cfg.paint] });
+            });
+          }
+          const box2 = new THREE.Box3().setFromObject(obj);
+          const center2 = new THREE.Vector3();
+          box2.getCenter(center2);
+          const groundH = env.terrain.getHeight(x, z);
+          obj.position.set(x - center2.x, groundH - box2.min.y + 0.1, z - center2.z);
+          obj.rotation.y = [0, Math.PI / 2, Math.PI, -Math.PI / 2][i % 4];
+          obj.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+          groundModelGroup.add(obj);
+          loaded++;
+          console.log(`[ground-model] ✓ ${cfg.label} realLen=${cfg.realLen}m scale=${scale.toFixed(3)} paint=${cfg.paint}`);
+        } catch (e) {
+          console.warn('[ground-model] ✗ 加载失败:', cfg.path, e.message);
+        }
+      }
+      console.log(`[ground-model] 完成: ${loaded}/${GROUND_MODELS.length} 个模型已加载到 z=${CENTER_Z} 附近`);
+    })();
+
+    // ---------- 加载飞机 ----------
+    const statusEl = document.getElementById('status');
+    (async () => {
+      try {
+        await player.load(kurskLevel.playerModel || '/model/bf109_opt.glb');
+        player.reset();
+        // 关卡级玩家初始位置/朝向/速度
+        const ps = kurskLevel.playerStart;
+        if (ps) {
+          if (ps.position) {
+            const [px, py, pz] = ps.position;
+            player.root.position.set(px, py != null ? py : 700, pz);
+          }
+          if (ps.speed != null) player.speed = ps.speed;
+        }
+        player.aimLift = 0; // 追尾模式 aimLift=0（切座舱时设 AIM_LIFT_COCKPIT）
+        statusEl.textContent = '就绪 · C 切视角 · R 重置';
+        setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+        startLoop();
+      } catch (err) {
+        console.error('[terrain_test] 飞机加载失败:', err);
+        statusEl.textContent = '加载失败: ' + err.message;
+      }
+    })();
+
+    // ---------- 重置玩家到出生点 ----------
+    function resetPlayer() {
+      if (!player.model) return;
+      player.reset();
+      const ps = kurskLevel.playerStart;
+      if (ps) {
+        if (ps.position) {
+          const [px, py, pz] = ps.position;
+          player.root.position.set(px, py != null ? py : 700, pz);
+        }
+        if (ps.speed != null) player.speed = ps.speed;
+      }
+      player.aimLift = (camMode === 'cockpit') ? AIM_LIFT_COCKPIT : 0;
+      camInited = false; // 重置相机首帧直接 copy 到位
+      statusEl.textContent = '已重置';
+      setTimeout(() => { if (player.model) statusEl.style.display = 'none'; }, 1500);
+    }
+
+    // ---------- 相机更新（对齐 GameRuntime._updateCamera，简化无剧情/观察）----------
+    function updateCamera(dt) {
+      if (!player.model) return;
+      const ac = player.root;
+
+      if (camMode === 'cockpit') {
+        // 座舱视角（body frame，机头=-Z）
+        const ck = cockpitCfg;
+        _camOff.set(ck.x, ck.y, ck.z).applyQuaternion(ac.quaternion).add(ac.position);
+        camera.position.copy(_camOff);
+        _fwd.copy(player.getForward()).multiplyScalar(ck.lookDist).add(_camOff);
+        camera.lookAt(_fwd);
+      } else if (camMode === 'top') {
+        // 俯瞰视角：玩家正上方高处，向下看，便于观察地形颜色/起伏分布
+        _camOff.set(0, 260, 0.5).applyQuaternion(ac.quaternion).add(ac.position);
+        camera.position.copy(_camOff);
+        _lookAt.copy(ac.position);
+        camera.lookAt(_lookAt);
+      } else {
+        // 追尾视角：body frame 偏移 + lerp 平滑
+        _camOff.copy(camOffsets.chase).applyQuaternion(ac.quaternion).add(ac.position);
+        if (camInited) camera.position.lerp(_camOff, 1 - Math.exp(-dt * 4.5));
+        else { camera.position.copy(_camOff); camInited = true; }
+        _lookAt.copy(player.getForward()).multiplyScalar(8).add(ac.position);
+        camera.lookAt(_lookAt);
+      }
+    }
+
+    // ---------- HUD 更新 ----------
+    const hudMode = document.getElementById('hud-mode');
+    const hudSpeed = document.getElementById('hud-speed');
+    const hudAlt = document.getElementById('hud-alt');
+    const hudAgl = document.getElementById('hud-agl');
+    const hudPos = document.getElementById('hud-pos');
+    let hudTick = 0;
+    function updateHud() {
+      hudTick++;
+      if (hudTick % 3 !== 0) return; // 每 3 帧刷新一次，省 DOM 开销
+      hudMode.textContent = CAM_LABELS[camMode];
+      hudSpeed.textContent = Math.round(player.speed * 3.6);
+      const py = player.root.position.y;
+      hudAlt.textContent = Math.round(py);
+      const groundH = env.terrain ? env.terrain.getHeight(player.root.position.x, player.root.position.z) : 0;
+      hudAgl.textContent = Math.round(py - groundH);
+      hudPos.textContent = Math.round(player.root.position.x) + ', ' + Math.round(player.root.position.z);
+    }
+
+    // ---------- 主循环 ----------
+    const clock = new THREE.Clock();
+    let rafId = 0;
+    function startLoop() {
+      clock.start();
+      loop();
+    }
+    function loop() {
+      rafId = requestAnimationFrame(loop);
+      const dt = Math.min(clock.getDelta(), 0.05);
+
+      // 1. 输入
+      controls.tick(dt);
+      const input = controls.flightInput();
+
+      // 2. 玩家物理 + 动画
+      if (player.model) {
+        // 坠毁自动重置（地形测试不允许"死"）
+        if (player.crashed) {
+          resetPlayer();
+        } else {
+          player.updateFlight(dt, input);
+          player.update(dt);
+        }
+      }
+
+      // 3. 云层跟随 + 天空球跟随相机 + 天边云漂移 + 战场烟柱更新
+      if (player.model) {
+        clouds.update(player.root.position, player.getForward(), camera);
+      }
+      if (env.sky) env.sky.position.copy(camera.position);
+      if (env.updateSkyClouds) env.updateSkyClouds(dt);
+      if (env.battlefield) env.battlefield.update(dt);
+
+      // 4. 相机
+      updateCamera(dt);
+
+      // 4.5 地平线底盘跟随相机 XZ（不跟随 Y，保持贴地 y=-100）
+      //     确保任何位置都延伸到地平线，永远遮住方形地形边角
+      apron.position.x = camera.position.x;
+      apron.position.z = camera.position.z;
+
+      // 5. HUD
+      updateHud();
+
+      // 6. 渲染
+      renderer.render(scene, camera);
+    }
+
+    // ---------- 键盘：C 切视角 / R 重置 ----------
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyC') {
+        const idx = CAM_MODES.indexOf(camMode);
+        camMode = CAM_MODES[(idx + 1) % CAM_MODES.length];
+        player.aimLift = (camMode === 'cockpit') ? AIM_LIFT_COCKPIT : 0;
+        camInited = false;
+        statusEl.style.display = '';
+        statusEl.textContent = '视角：' + CAM_LABELS[camMode];
+        setTimeout(() => { if (player.model) statusEl.style.display = 'none'; }, 1200);
+      } else if (e.code === 'KeyR') {
+        resetPlayer();
+      }
+    });
+
+    // ---------- 窗口 resize ----------
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    // 调试接口
+    window.__test = { player, env, clouds, scene, camera, renderer, resetPlayer };
+  </script>
+</body>
+</html>

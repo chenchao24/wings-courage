@@ -1,0 +1,31 @@
+# 依赖（npm install 可重建）
+node_modules/
+
+# Python 虚拟环境（scripts/ 管线用，可重建）
+scripts/.venv-ground/
+
+# 编辑器 / AI 工具本地数据
+.codegraph/
+.codeartsdoer/
+.trae/
+.zcode/
+.wrangler/
+
+# 缓存与中间产物（可重建）
+scripts/_ground_cache/
+scripts/_eg_cache/
+
+# 过期构建残留
+dist/
+
+# 测试截图产物（可再生成）
+tests/screenshots/
+tests/test_shots/
+
+# 本地归档（不随仓库上传）
+_archive/
+
+# 系统杂项
+Thumbs.db
+.DS_Store
+*.log

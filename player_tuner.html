@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>玩家飞机调试台 · Bf 109 E-4</title>
+<!--
+  玩家飞机通用调试页（未来玩家飞机的唯一调试入口）。
+  合并 tune.html（枪口/准星 + Bf 109 桨动画抽取）与 model_tuner.html（Tab 框架/导出/校准复刻）能力，
+  新增机舱视角调节 + 飞行物理参数两组。
+  渲染管线严格复刻 aircraft.js（_normalize -> _autoOrient -> _applyCalibration）+ tune.js（桨动画抽取）。
+  导出片段 A -> js/aircraft.js 构造函数；片段 B -> js/game/GameRuntime.js 常量。
+-->
+<style>
+  :root {
+    --panel: rgba(12, 18, 22, 0.90);
+    --panel-solid: #0c1216;
+    --line: rgba(120, 180, 210, 0.30);
+    --line-strong: rgba(120, 180, 210, 0.55);
+    --accent: #6fd0ff;
+    --warn: #ffb84d;
+    --fire: #ff5a4d;
+    --text: #d7e6ee;
+    --muted: #8aa0ad;
+    --muz: #ffb84d;
+    --bg: #05080a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; font-size: 13px; }
+  #scene { display: block; width: 100vw; height: 100vh; }
+
+  /* ===== 顶栏 ===== */
+  #topbar { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 11;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 22px;
+    padding: 6px 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: 96vw; }
+  #topbar label { color: var(--muted); font-size: 12px; }
+  #topbar button { background: rgba(111,208,255,.10); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--text); padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  #topbar button:hover { background: rgba(111,208,255,.22); }
+  #topbar button.go { background: var(--accent); color: #05080a; font-weight: 600; }
+  #topbar button.warn { color: var(--warn); border-color: rgba(255,184,77,.4); }
+  #topbar small { color: var(--muted); font-size: 11px; }
+  #topbar .sep { color: var(--line-strong); margin: 0 2px; }
+  #topbar .title { color: var(--accent); letter-spacing: 2px; font-size: 13px; font-weight: 600; }
+
+  /* ===== 右侧 Tab 面板 ===== */
+  #panel { position: fixed; top: 60px; right: 10px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    width: 360px; max-height: calc(100vh - 90px); display: flex; flex-direction: column;
+    backdrop-filter: blur(6px); }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .tabs button { flex: 1; background: transparent; border: none; color: var(--muted);
+    padding: 8px 4px; font-size: 11px; cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all .15s; }
+  .tabs button:hover { color: var(--text); background: rgba(111,208,255,.06); }
+  .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(111,208,255,.08); }
+  .tab-content { display: none; padding: 10px 12px; overflow-y: auto; flex: 1; }
+  .tab-content.active { display: block; }
+  .tab-content h4 { color: var(--accent); letter-spacing: 1px; margin: 12px 0 6px; font-size: 11px;
+    border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+  .tab-content h4:first-child { margin-top: 0; }
+  .tab-content h4 .sub { color: var(--muted); font-size: 10px; font-weight: normal; letter-spacing: 0; float: right; }
+  .ctrl { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .ctrl label { width: 92px; color: var(--muted); font-size: 11px; }
+  .ctrl input[type=range] { flex: 1; min-width: 50px; }
+  .ctrl .val { width: 60px; text-align: right; color: var(--accent); font-variant-numeric: tabular-nums; font-size: 11px; }
+  .ctrl input[type=number].val {
+    background: rgba(0,0,0,.4); border: 1px solid var(--line); border-radius: 3px;
+    padding: 2px 4px; font-size: 11px; font-family: Consolas, monospace; color: var(--accent); }
+  .ctrl input[type=number].val:focus { outline: none; border-color: var(--accent); }
+  .ctrl select { flex: 1; background: rgba(0,0,0,.4); color: var(--accent);
+    border: 1px solid var(--line); border-radius: 3px; padding: 2px 6px; font-size: 11px; }
+  .btn-row { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0; }
+  .btn-row button { background: rgba(111,208,255,.10); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--text); padding: 4px 8px; font-size: 10px; cursor: pointer; flex: 1; min-width: 60px; }
+  .btn-row button:hover { background: rgba(111,208,255,.22); }
+  .btn-row button.active { background: var(--accent); color: #05080a; font-weight: 600; }
+  .btn-row button.warn { color: var(--warn); border-color: rgba(255,184,77,.4); }
+  .btn-row button.go { background: var(--accent); color: #05080a; font-weight: 600; }
+  .check { display: flex; align-items: center; gap: 6px; margin: 4px 0; cursor: pointer; font-size: 11px; }
+  .check input { margin: 0; }
+  .check label { color: var(--muted); cursor: pointer; }
+  .hint-text { font-size: 10px; color: var(--muted); line-height: 1.5; margin: 4px 0; padding: 6px 8px;
+    background: rgba(0,0,0,.25); border-radius: 4px; border-left: 2px solid var(--line); }
+  .hint-text b { color: var(--accent); }
+  .hint-text .warn { color: var(--warn); }
+  .hint-text .muz { color: var(--muz); }
+
+  /* 枪口分组卡片 */
+  .muz-group { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 6px 0; background: rgba(0,0,0,.15); }
+  .muz-group .muz-title { color: var(--muz); font-size: 11px; font-weight: 600; margin-bottom: 4px; }
+  .muz-group .ctrl { margin: 2px 0; }
+  .muz-group .ctrl label { width: 50px; font-size: 10px; }
+
+  /* ===== 底部状态条 ===== */
+  #status { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 11;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    padding: 4px 16px; color: var(--muted); font-size: 11px; max-width: 90vw; }
+  #status.ok { color: #6fff8a; border-color: rgba(111,255,138,.3); }
+  #status.err { color: var(--fire); border-color: rgba(255,90,77,.3); }
+  #status .acc { color: var(--accent); }
+
+  /* ===== 导出弹窗 ===== */
+  #export-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 30;
+    background: var(--panel-solid); border: 1px solid var(--accent); border-radius: 10px; padding: 16px;
+    max-width: 760px; width: 92%; max-height: 88vh; flex-direction: column; }
+  #export-modal.show { display: flex; }
+  #export-modal h3 { color: var(--accent); margin-bottom: 4px; font-size: 14px; }
+  #export-modal .modal-sub { color: var(--muted); font-size: 11px; margin-bottom: 10px; }
+  #export-modal .export-tabs { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+  #export-modal .export-tabs button { background: rgba(111,208,255,.08); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--muted); padding: 4px 10px; font-size: 10px; cursor: pointer; }
+  #export-modal .export-tabs button.active { background: var(--accent); color: #05080a; }
+  #export-text { flex: 1; width: 100%; min-height: 360px; background: rgba(0,0,0,.55); color: #6fff8a;
+    border: 1px solid var(--line); border-radius: 4px; padding: 10px; font-family: Consolas, monospace;
+    font-size: 11px; line-height: 1.5; resize: none; white-space: pre; overflow: auto; }
+  #export-modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+  #export-modal .modal-actions button { border-radius: 4px; padding: 6px 16px; cursor: pointer; font-size: 12px; border: 1px solid; }
+  #btn-copy-export { background: rgba(111,255,138,.15); border-color: #6fff8a; color: #6fff8a; }
+  #btn-close-export { background: rgba(255,90,77,.15); border-color: var(--fire); color: var(--fire); }
+
+  /* ===== 加载层 ===== */
+  #loader { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 40%, #122029, #05080a 70%); transition: opacity .4s; }
+  #loader.hide { opacity: 0; pointer-events: none; }
+  #loader .title { font-size: 20px; letter-spacing: 4px; color: var(--accent); margin-bottom: 18px; }
+  .bar { width: 300px; max-width: 70vw; height: 6px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #6fd0ff, #2a8fd0); transition: width .2s; }
+  #loader .pct { margin-top: 12px; font-size: 12px; color: var(--muted); }
+  #loader .err { margin-top: 16px; color: var(--fire); font-size: 12px; max-width: 80vw; text-align: center; }
+
+  /* 滚动条美化 */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: rgba(0,0,0,.2); }
+  ::-webkit-scrollbar-thumb { background: rgba(111,208,255,.3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(111,208,255,.5); }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<!-- ===== 顶栏 ===== -->
+<div id="topbar">
+  <span class="title">玩家飞机调试台 · Bf 109 E-4</span>
+  <small>|</small>
+  <label>桨模式</label>
+  <button id="btn-prop-blur" class="active">模糊盘</button>
+  <button id="btn-prop-anim">动画桨</button>
+  <button id="btn-prop-slow">慢速桨</button>
+  <small>|</small>
+  <button id="btn-gear" class="active" title="起落架显示/隐藏（Bf 109 不藏起落架，仅 visibility 切换预览）">起落架</button>
+  <button id="btn-bbox">包围盒</button>
+  <button id="btn-axis">世界轴</button>
+  <small>|</small>
+  <button class="warn" id="btn-export">📋 导出配置</button>
+</div>
+
+<!-- ===== 右侧 Tab 面板 ===== -->
+<div id="panel">
+  <div class="tabs">
+    <button data-tab="cockpit" class="active">① 机舱视角</button>
+    <button data-tab="muzzle">② 枪口准星</button>
+    <button data-tab="base">③ 模型校准</button>
+    <button data-tab="phys">④ 飞行物理</button>
+  </div>
+
+  <!-- ① 机舱视角 -->
+  <div id="tab-cockpit" class="tab-content active">
+    <h4>座舱相机位置 <span class="sub">COCKPIT_CFG · body frame</span></h4>
+    <div class="ctrl"><label>X 左右</label><input type="range" id="ck-x" min="-2" max="2" step="0.01" value="0.00"><input type="number" class="val" id="ck-x-n" min="-2" max="2" step="0.01" value="0.00"></div>
+    <div class="ctrl"><label>Y 上下</label><input type="range" id="ck-y" min="0.5" max="3" step="0.01" value="1.65"><input type="number" class="val" id="ck-y-n" min="0.5" max="3" step="0.01" value="1.65"></div>
+    <div class="ctrl"><label>Z 前后</label><input type="range" id="ck-z" min="-3" max="1" step="0.01" value="-0.70"><input type="number" class="val" id="ck-z-n" min="-3" max="1" step="0.01" value="-0.70"></div>
+    <div class="ctrl"><label>前视距离</label><input type="range" id="ck-look" min="20" max="300" step="1" value="80"><input type="number" class="val" id="ck-look-n" min="20" max="300" step="1" value="80"></div>
+
+    <h4>瞄准上抬 <span class="sub">座舱模式准星+子弹方向</span></h4>
+    <div class="ctrl"><label>AIM_LIFT_COCKPIT</label><input type="range" id="ck-lift" min="0" max="0.3" step="0.005" value="0.12"><input type="number" class="val" id="ck-lift-n" min="0" max="0.3" step="0.005" value="0.12"></div>
+    <div class="hint-text">座舱模式下准星上抬比例，同时驱动子弹方向（<b>getAimDirection</b>），保证准星指向与子弹落点重合。追尾/观察模式 aimLift=0 不受此控。</div>
+
+    <h4>追尾相机偏移 <span class="sub">CAM_OFFSETS.chase</span></h4>
+    <div class="ctrl"><label>chase X</label><input type="range" id="ch-x" min="-5" max="5" step="0.1" value="0"><input type="number" class="val" id="ch-x-n" min="-5" max="5" step="0.1" value="0"></div>
+    <div class="ctrl"><label>chase Y</label><input type="range" id="ch-y" min="0" max="8" step="0.1" value="3.4"><input type="number" class="val" id="ch-y-n" min="0" max="8" step="0.1" value="3.4"></div>
+    <div class="ctrl"><label>chase Z</label><input type="range" id="ch-z" min="5" max="25" step="0.1" value="12.5"><input type="number" class="val" id="ch-z-n" min="5" max="25" step="0.1" value="12.5"></div>
+
+    <h4>准星投影距离 <span class="sub">aimDist（仅准星，不影响弹道）</span></h4>
+    <div class="ctrl"><label>aimDist</label><input type="range" id="ck-aimdist" min="400" max="4000" step="50" value="1600"><input type="number" class="val" id="ck-aimdist-n" min="400" max="4000" step="50" value="1600"></div>
+    <div class="hint-text"><span class="warn">注意</span>：aimDist 只影响准星投影位置（拉远减少飞机自身遮挡），<b>不影响子弹弹道</b>。改它会破坏准星与子弹重合，慎调。</div>
+
+    <h4>视角</h4>
+    <div class="btn-row">
+      <button id="btn-cam-chase" class="active">追尾</button>
+      <button id="btn-cam-cockpit">座舱</button>
+    </div>
+    <div class="hint-text"><b>C</b> 键切换 · 座舱内<b>右键拖拽</b>调整自由视野 · 追尾模式<b>滚轮</b>缩放 · 外部右键绕飞机观察</div>
+
+    <h4>恢复</h4>
+    <div class="btn-row"><button class="warn" id="btn-reset-cockpit">恢复默认</button></div>
+  </div>
+
+  <!-- ② 枪口与准星 -->
+  <div id="tab-muzzle" class="tab-content">
+    <h4>机枪枪口位置 <span class="sub">body frame · 机头=-Z · userScale=3.6 缩放后</span></h4>
+    <div class="muz-group">
+      <div class="muz-title">右机翼</div>
+      <div class="ctrl"><label>X</label><input type="range" id="mz0-x" min="-8" max="8" step="0.05" value="7.80"><input type="number" class="val" id="mz0-x-n" min="-8" max="8" step="0.05" value="7.80"></div>
+      <div class="ctrl"><label>Y</label><input type="range" id="mz0-y" min="-2" max="4" step="0.05" value="-0.95"><input type="number" class="val" id="mz0-y-n" min="-2" max="4" step="0.05" value="-0.95"></div>
+      <div class="ctrl"><label>Z</label><input type="range" id="mz0-z" min="-8" max="2" step="0.05" value="-6.15"><input type="number" class="val" id="mz0-z-n" min="-8" max="2" step="0.05" value="-6.15"></div>
+    </div>
+    <div class="muz-group">
+      <div class="muz-title">左机翼</div>
+      <div class="ctrl"><label>X</label><input type="range" id="mz1-x" min="-8" max="8" step="0.05" value="-7.85"><input type="number" class="val" id="mz1-x-n" min="-8" max="8" step="0.05" value="-7.85"></div>
+      <div class="ctrl"><label>Y</label><input type="range" id="mz1-y" min="-2" max="4" step="0.05" value="-0.95"><input type="number" class="val" id="mz1-y-n" min="-2" max="4" step="0.05" value="-0.95"></div>
+      <div class="ctrl"><label>Z</label><input type="range" id="mz1-z" min="-8" max="2" step="0.05" value="-6.25"><input type="number" class="val" id="mz1-z-n" min="-8" max="2" step="0.05" value="-6.25"></div>
+    </div>
+    <div class="muz-group">
+      <div class="muz-title">右机头</div>
+      <div class="ctrl"><label>X</label><input type="range" id="mz2-x" min="-8" max="8" step="0.05" value="0.60"><input type="number" class="val" id="mz2-x-n" min="-8" max="8" step="0.05" value="0.60"></div>
+      <div class="ctrl"><label>Y</label><input type="range" id="mz2-y" min="-2" max="4" step="0.05" value="1.35"><input type="number" class="val" id="mz2-y-n" min="-2" max="4" step="0.05" value="1.35"></div>
+      <div class="ctrl"><label>Z</label><input type="range" id="mz2-z" min="-8" max="2" step="0.05" value="-6.45"><input type="number" class="val" id="mz2-z-n" min="-8" max="2" step="0.05" value="-6.45"></div>
+    </div>
+    <div class="muz-group">
+      <div class="muz-title">左机头</div>
+      <div class="ctrl"><label>X</label><input type="range" id="mz3-x" min="-8" max="8" step="0.05" value="-0.60"><input type="number" class="val" id="mz3-x-n" min="-8" max="8" step="0.05" value="-0.60"></div>
+      <div class="ctrl"><label>Y</label><input type="range" id="mz3-y" min="-2" max="4" step="0.05" value="1.35"><input type="number" class="val" id="mz3-y-n" min="-2" max="4" step="0.05" value="1.35"></div>
+      <div class="ctrl"><label>Z</label><input type="range" id="mz3-z" min="-8" max="2" step="0.05" value="-6.45"><input type="number" class="val" id="mz3-z-n" min="-8" max="2" step="0.05" value="-6.45"></div>
+    </div>
+    <div class="btn-row">
+      <button id="btn-markers" class="active">枪口标记</button>
+      <button id="btn-rays" class="active">弹道射线</button>
+    </div>
+    <div class="hint-text"><span class="muz">红球</span>=枪口位置；<span class="muz">红线</span>=子弹方向（沿机头 -Z）。调红球贴合模型枪口即可。注：aimLift 上抬量在 ① 机舱视角 Tab 调。</div>
+    <div class="btn-row"><button class="warn" id="btn-reset-muzzle">恢复默认</button></div>
+  </div>
+
+  <!-- ③ 模型校准 -->
+  <div id="tab-base" class="tab-content">
+    <h4>朝向校准 <span class="sub">机头对齐 -Z</span></h4>
+    <div class="check"><input type="checkbox" id="auto-orient" checked><label for="auto-orient">autoOrient（按螺旋桨质心自动算偏航）</label></div>
+    <div class="ctrl"><label>yawOffset °</label><input type="range" id="yaw" min="-180" max="180" step="0.5" value="0"><input type="number" class="val" id="yaw-n" min="-180" max="180" step="0.5" value="0"></div>
+    <div class="ctrl"><label>pitchOffset °</label><input type="range" id="pitch" min="-30" max="30" step="0.5" value="0"><input type="number" class="val" id="pitch-n" min="-30" max="30" step="0.5" value="0"></div>
+    <div class="ctrl"><label>rollOffset °</label><input type="range" id="roll" min="-30" max="30" step="0.5" value="0"><input type="number" class="val" id="roll-n" min="-30" max="30" step="0.5" value="0"></div>
+    <div class="hint-text">autoOrient=true 时 yawOffset 自动计算，手动值不生效（Bf 109 默认 true）。关闭后用手动 yaw。</div>
+
+    <h4>缩放与中心 <span class="sub">userScale = 3.6（Bf 109 基准）</span></h4>
+    <div class="ctrl"><label>userScale</label><input type="range" id="scale" min="1" max="8" step="0.01" value="3.6"><input type="number" class="val" id="scale-n" min="1" max="8" step="0.01" value="3.6"></div>
+    <div class="ctrl"><label>centerOffset X</label><input type="range" id="cx" min="-3" max="3" step="0.05" value="0"><input type="number" class="val" id="cx-n" min="-3" max="3" step="0.05" value="0"></div>
+    <div class="ctrl"><label>centerOffset Y</label><input type="range" id="cy" min="-3" max="3" step="0.05" value="0"><input type="number" class="val" id="cy-n" min="-3" max="3" step="0.05" value="0"></div>
+    <div class="ctrl"><label>centerOffset Z</label><input type="range" id="cz" min="-3" max="3" step="0.05" value="0"><input type="number" class="val" id="cz-n" min="-3" max="3" step="0.05" value="0"></div>
+
+    <h4>模型尺寸信息</h4>
+    <div class="hint-text" id="size-info">载入中…</div>
+
+    <h4>恢复</h4>
+    <div class="btn-row"><button class="warn" id="btn-reset-base">恢复默认</button></div>
+  </div>
+
+  <!-- ④ 飞行物理 -->
+  <div id="tab-phys" class="tab-content">
+    <h4>速度 <span class="sub">场景单位/秒</span></h4>
+    <div class="ctrl"><label>maxSpeed</label><input type="range" id="p-maxspd" min="80" max="250" step="1" value="165"><input type="number" class="val" id="p-maxspd-n" min="80" max="250" step="1" value="165"></div>
+    <div class="ctrl"><label>minSpeed</label><input type="range" id="p-minspd" min="2" max="30" step="1" value="8"><input type="number" class="val" id="p-minspd-n" min="2" max="30" step="1" value="8"></div>
+    <div class="ctrl"><label>cruiseSpeed</label><input type="range" id="p-cruise" min="40" max="150" step="1" value="90"><input type="number" class="val" id="p-cruise-n" min="40" max="150" step="1" value="90"></div>
+
+    <h4>俯仰 <span class="sub">rad/s</span></h4>
+    <div class="ctrl"><label>pitchMax</label><input type="range" id="p-pmax" min="0.3" max="2.5" step="0.05" value="1.3"><input type="number" class="val" id="p-pmax-n" min="0.3" max="2.5" step="0.05" value="1.3"></div>
+    <div class="ctrl"><label>pitchResp</label><input type="range" id="p-presp" min="2" max="10" step="0.1" value="6.0"><input type="number" class="val" id="p-presp-n" min="2" max="10" step="0.1" value="6.0"></div>
+
+    <h4>滚转 <span class="sub">rad/s</span></h4>
+    <div class="ctrl"><label>rollMax</label><input type="range" id="p-rmax" min="0.5" max="4" step="0.05" value="2.6"><input type="number" class="val" id="p-rmax-n" min="0.5" max="4" step="0.05" value="2.6"></div>
+    <div class="ctrl"><label>rollResp</label><input type="range" id="p-rresp" min="2" max="12" step="0.1" value="7.0"><input type="number" class="val" id="p-rresp-n" min="2" max="12" step="0.1" value="7.0"></div>
+
+    <h4>偏航 <span class="sub">rad/s</span></h4>
+    <div class="ctrl"><label>yawMax</label><input type="range" id="p-ymax" min="0.2" max="1.5" step="0.05" value="0.7"><input type="number" class="val" id="p-ymax-n" min="0.2" max="1.5" step="0.05" value="0.7"></div>
+    <div class="ctrl"><label>yawResp</label><input type="range" id="p-yresp" min="1" max="8" step="0.1" value="4.0"><input type="number" class="val" id="p-yresp-n" min="1" max="8" step="0.1" value="4.0"></div>
+
+    <h4>重力与升力</h4>
+    <div class="ctrl"><label>gravity</label><input type="range" id="p-grav" min="0" max="8" step="0.1" value="4.0"><input type="number" class="val" id="p-grav-n" min="0" max="8" step="0.1" value="4.0"></div>
+    <div class="ctrl"><label>liftK</label><input type="range" id="p-liftk" min="0" max="0.06" step="0.001" value="0.026"><input type="number" class="val" id="p-liftk-n" min="0" max="0.06" step="0.001" value="0.026"></div>
+    <div class="ctrl"><label>stallThreshold</label><input type="range" id="p-stall" min="4" max="30" step="1" value="12"><input type="number" class="val" id="p-stall-n" min="4" max="30" step="1" value="12"></div>
+    <div class="check"><input type="checkbox" id="p-gravity" checked><label for="p-gravity">enableGravity</label></div>
+    <div class="check"><input type="checkbox" id="p-coupling" checked><label for="p-coupling">enableCoupling（滚转-偏航耦合）</label></div>
+
+    <div class="hint-text"><span class="warn">注</span>：静态场景无飞行视觉效果，调好导出后在游戏内测试。liftK 使 maxSpeed 时升力略大于重力（高速平飞净零、低速下沉）。</div>
+    <div class="btn-row"><button class="warn" id="btn-reset-phys">恢复默认</button></div>
+  </div>
+</div>
+
+<!-- ===== 底部状态条 ===== -->
+<div id="status">载入中…</div>
+
+<!-- ===== 导出弹窗 ===== -->
+<div id="export-modal">
+  <h3>导出配置</h3>
+  <div class="modal-sub">调好的参数对应现有代码位置，手动复制粘贴落地。</div>
+  <div class="export-tabs">
+    <button data-export="all" class="active">全量</button>
+    <button data-export="aircraft">片段 A · aircraft.js 构造函数</button>
+    <button data-export="runtime">片段 B · GameRuntime.js 常量</button>
+  </div>
+  <textarea id="export-text" readonly></textarea>
+  <div class="modal-actions">
+    <button id="btn-copy-export">复制</button>
+    <button id="btn-close-export">关闭</button>
+  </div>
+</div>
+
+<!-- ===== 加载层 ===== -->
+<div id="loader">
+  <div class="title">PLAYER TUNER · Bf 109 E-4</div>
+  <div class="bar"><i id="loader-fill"></i></div>
+  <div class="pct" id="loader-pct">0%</div>
+  <div class="err" id="loader-err"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/node_modules/three/build/three.module.js",
+    "three/addons/": "/node_modules/three/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+// ====================================================================
+// 默认值（与 aircraft.js 构造函数 + GameRuntime.js 常量严格对齐）
+// 改动这些默认值时同步改对应源码注释行号
+// ====================================================================
+const DEFAULTS = {
+  // ① 机舱视角（GameRuntime.js:39,44,45,1030）
+  cockpit: { x: 0.00, y: 1.65, z: -0.70, lookDist: 80, aimLift: 0.12 },
+  chase:   { x: 0, y: 3.4, z: 12.5 },
+  aimDist: 1600,
+  // ② 枪口（aircraft.js:162-167）
+  muzzles: [
+    { name: '右机翼', x: 7.80, y: -0.95, z: -6.15 },
+    { name: '左机翼', x: -7.85, y: -0.95, z: -6.25 },
+    { name: '右机头', x: 0.60, y: 1.35, z: -6.45 },
+    { name: '左机头', x: -0.60, y: 1.35, z: -6.45 },
+  ],
+  // ③ 校准（aircraft.js:129-135）
+  base: { autoOrient: true, yaw: 0, pitch: 0, roll: 0, scale: 3.6, cx: 0, cy: 0, cz: 0 },
+  // ④ 飞行物理（aircraft.js:124-196）
+  phys: {
+    maxSpeed: 165, minSpeed: 8, cruiseSpeed: 90,
+    pitchMax: 1.3, pitchResp: 6.0, rollMax: 2.6, rollResp: 7.0, yawMax: 0.7, yawResp: 4.0,
+    gravity: 4.0, liftK: 0.026, stallThreshold: 12, enableGravity: true, enableCoupling: true,
+  },
+};
+
+// 当前可变状态（深拷贝默认值）
+const state = {
+  cockpit: { ...DEFAULTS.cockpit },
+  chase: { ...DEFAULTS.chase },
+  aimDist: DEFAULTS.aimDist,
+  muzzles: DEFAULTS.muzzles.map(m => ({ ...m })),
+  base: { ...DEFAULTS.base },
+  phys: { ...DEFAULTS.phys },
+};
+
+// ====================================================================
+// 三大场景对象
+// ====================================================================
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.5, 50000);
+camera.position.set(0, 70, 30);
+
+// 天空（渐变球，同 tune.js）
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(20000, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, toneMapped: false, depthWrite: false,
+    uniforms: {
+      topColor: { value: new THREE.Color(0x2a6fb6) },
+      midColor: { value: new THREE.Color(0x8fb8d8) },
+      botColor: { value: new THREE.Color(0x4a5530) },
+    },
+    vertexShader: `varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+    fragmentShader: `varying vec3 vP; uniform vec3 topColor; uniform vec3 midColor; uniform vec3 botColor;
+      void main(){ float h=normalize(vP).y; vec3 c=h>0.0?mix(midColor,topColor,smoothstep(0.0,0.55,h)):mix(midColor,botColor,smoothstep(0.0,-0.25,h)); gl_FragColor=vec4(c,1.0);}`,
+  })
+);
+scene.add(sky);
+
+// 光照（同 tune.js）
+scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x4a5d3a, 0.9));
+const sun = new THREE.DirectionalLight(0xfff1d0, 2.8);
+sun.position.set(40, 60, 30); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -40; sun.shadow.camera.right = 40;
+sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40;
+sun.shadow.camera.far = 200; sun.shadow.bias = -0.0004;
+scene.add(sun); scene.add(sun.target);
+scene.fog = new THREE.FogExp2(0xc4d2dc, 0.00020);
+
+// 地面网格（同 tune.js）
+const grid = new THREE.GridHelper(2400, 120, 0x9fd6ff, 0x3a5a72);
+grid.material.opacity = 0.32; grid.material.transparent = true; grid.position.y = 0.3;
+scene.add(grid);
+
+// 世界坐标轴
+const worldAxis = new THREE.AxesHelper(8);
+scene.add(worldAxis);
+
+// ====================================================================
+// 飞机：root -> modelYaw -> model（严格复刻 aircraft.js 结构）
+// ====================================================================
+const root = new THREE.Group();
+const modelYaw = new THREE.Group();
+root.add(modelYaw);
+scene.add(root);
+
+let model = null, mixer = null, propAction = null;
+let baseScale = 1;          // _normalize 算出的归一化缩放
+let yawOffset = 0;          // _autoOrient 算出的偏航（度）
+const propBranches = { anim: [], blur: [], slow: [] };
+let propMode = 'blur';
+
+// 包围盒 helper
+let bboxHelper = null;
+
+// 枪口标记球 + 弹道射线（复刻 tune.js:69-91）
+const muzzles = state.muzzles.map(m => ({ ...m }));
+const muzzleMarkers = [], rayLines = [];
+const RAY_LEN = 400;
+function buildMuzzleHelpers() {
+  // 清理旧的
+  muzzleMarkers.forEach(b => root.remove(b));
+  rayLines.forEach(l => root.remove(l));
+  muzzleMarkers.length = 0; rayLines.length = 0;
+  muzzles.forEach((m) => {
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(0.35, 12, 12),
+      new THREE.MeshBasicMaterial({ color: 0xff5a4d, depthTest: false })
+    );
+    ball.position.set(m.x, m.y, m.z); ball.renderOrder = 10; root.add(ball); muzzleMarkers.push(ball);
+    const pts = [new THREE.Vector3(m.x, m.y, m.z), new THREE.Vector3(m.x, m.y, m.z - RAY_LEN)];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xff5a4d, transparent: true, opacity: 0.5, depthTest: false }));
+    line.renderOrder = 9; root.add(line); rayLines.push(line);
+  });
+}
+
+function updateMuzzleHelpers() {
+  muzzles.forEach((m, i) => {
+    muzzleMarkers[i].position.set(m.x, m.y, m.z);
+    const arr = rayLines[i].geometry.attributes.position;
+    arr.setXYZ(0, m.x, m.y, m.z);
+    arr.setXYZ(1, m.x, m.y, m.z - RAY_LEN);
+    arr.needsUpdate = true;
+  });
+}
+
+// ====================================================================
+// 渲染管线：复刻 aircraft.js _normalize / _autoOrient / _applyCalibration
+// ====================================================================
+
+/** 缩放到目标尺寸 + 居中（含 centerOffset 微调）—— 复刻 _normalize() */
+function normalize() {
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const longest = Math.max(size.x, size.y, size.z) || 1;
+  const target = 9; // 目标最长边 = 9 单位（约 9 米）
+  baseScale = target / longest;
+  model.scale.setScalar(baseScale);
+  model.position.copy(center).multiplyScalar(-baseScale);
+  // centerOffset（body frame 世界单位，缩放后）
+  model.position.x += state.base.cx || 0;
+  model.position.y += state.base.cy || 0;
+  model.position.z += state.base.cz || 0;
+}
+
+/** 自动朝向校准：按螺旋桨质心算 yaw —— 复刻 _autoOrient() */
+function autoOrient() {
+  if (!state.base.autoOrient) { applyCalibration(); return; }
+  model.updateWorldMatrix(true, true);
+  // 按关键词匹配螺旋桨节点（Bf 109 用 PROP_KEYWORDS）
+  const propNodes = [];
+  const PROP_KEYWORDS = ['prop', '螺旋桨', 'airscrew', 'propeller'];
+  model.traverse((o) => {
+    if (o.name && PROP_KEYWORDS.some(k => o.name.toLowerCase().includes(k))) propNodes.push(o);
+  });
+  if (!propNodes.length) { applyCalibration(); return; }
+  // 几何质心（同 _autoOrient 用 Box3 中心）
+  const c = new THREE.Vector3();
+  const tmpBox = new THREE.Box3();
+  const tmpCenter = new THREE.Vector3();
+  propNodes.forEach((o) => { tmpBox.setFromObject(o); tmpBox.getCenter(tmpCenter); c.add(tmpCenter); });
+  c.divideScalar(propNodes.length);
+  const nx = c.x, nz = c.z;
+  if (Math.hypot(nx, nz) < 1e-3) { applyCalibration(); return; }
+  const phi = Math.atan2(nx, nz);
+  yawOffset = THREE.MathUtils.radToDeg(Math.PI - phi);
+  applyCalibration();
+}
+
+/** 应用校准：modelYaw 旋转 + model 缩放 —— 复刻 _applyCalibration() */
+function applyCalibration() {
+  // YXZ 顺序：先偏航(Y)对齐机头水平方向，再俯仰(X)修正上下，最后滚转(Z)修正侧倾
+  modelYaw.rotation.set(
+    THREE.MathUtils.degToRad(state.base.pitch),
+    THREE.MathUtils.degToRad(state.base.autoOrient ? yawOffset : state.base.yaw),
+    THREE.MathUtils.degToRad(state.base.roll),
+    'YXZ'
+  );
+  // 仅缩放，不动 model.position（已在 normalize 中设好，改 position 会导致座舱视角偏移）
+  model.scale.setScalar(baseScale * state.base.scale);
+}
+
+/** 桨动画抽取：576 轨中抽 30 条 prop 轨 —— 复刻 tune.js:147-164 */
+function setupPropAnimation(gltf) {
+  mixer = new THREE.AnimationMixer(model);
+  if (gltf.animations && gltf.animations.length) {
+    const propTracks = [];
+    gltf.animations.forEach((clip) => {
+      clip.tracks.forEach((t) => {
+        const dot = t.name.lastIndexOf('.');
+        const node = dot > 0 ? t.name.substring(0, dot) : t.name;
+        if (/prop/i.test(node)) propTracks.push(t);
+      });
+    });
+    if (propTracks.length) {
+      const propClip = new THREE.AnimationClip('Prop', gltf.animations[0].duration, propTracks);
+      propAction = mixer.clipAction(propClip);
+      propAction.setLoop(THREE.LoopRepeat, Infinity);
+      propAction.play();
+      propAction.timeScale = 30;
+    }
+  }
+  // 桨分支分类（anim/slow/blur），复刻 tune.js:166-170
+  let propSet = null;
+  model.traverse((o) => { if (o.name && /^Prop_Set/i.test(o.name)) propSet = o; });
+  const classify = (name) => (/blur/i.test(name) ? 'blur' : /slow/i.test(name) ? 'slow' : 'anim');
+  if (propSet) propSet.children.forEach((c) => propBranches[classify(c.name || '')].push(c));
+  applyPropMode();
+}
+
+function applyPropMode() {
+  const m = propMode;
+  propBranches.anim.forEach((n) => (n.visible = m === 'all' || m === 'anim'));
+  propBranches.blur.forEach((n) => (n.visible = m === 'all' || m === 'blur'));
+  propBranches.slow.forEach((n) => (n.visible = m === 'all' || m === 'slow'));
+}
+
+// ====================================================================
+// 模型加载（复刻 tune.js:104-175 + aircraft.js 模板后处理）
+// ====================================================================
+async function loadModel() {
+  const loader = new GLTFLoader();
+  const draco = new DRACOLoader();
+  draco.setDecoderPath('/node_modules/three/examples/jsm/libs/draco/');
+  loader.setDRACOLoader(draco);
+  loader.setMeshoptDecoder(MeshoptDecoder);
+
+  const gltf = await loader.loadAsync('/model/bf109_opt.glb', (e) => {
+    if (e.lengthComputable) {
+      const p = (e.loaded / e.total) * 100;
+      document.getElementById('loader-fill').style.width = p + '%';
+      document.getElementById('loader-pct').textContent = p.toFixed(0) + '%';
+    }
+  });
+  model = gltf.scene;
+  // 模板后处理（同 aircraft.js load 内）：阴影 + roughness 提亮
+  model.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = true; o.receiveShadow = true;
+      if (o.material) {
+        (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+          if (m.roughness !== undefined) m.roughness = Math.min(1, m.roughness + 0.05);
+        });
+      }
+    }
+  });
+
+  // 渲染管线：normalize -> autoOrient（内含 applyCalibration）
+  normalize();
+  modelYaw.add(model);
+  autoOrient();
+
+  // 桨动画
+  setupPropAnimation(gltf);
+
+  // 枪口标记
+  buildMuzzleHelpers();
+
+  // 摆位
+  root.position.set(0, 60, 0);
+  updateSizeInfo();
+  setStatus('就绪 · 调红球贴合枪口 / 调座舱视角', 'ok');
+  setTimeout(() => document.getElementById('loader').classList.add('hide'), 300);
+}
+
+/** 重新应用校准（用户改参数后调用，不重新加载模型） */
+function reapplyCalibration() {
+  if (!model) return;
+  normalize();          // 重新算 baseScale + position（含 centerOffset）
+  autoOrient();         // 重新算 yawOffset + applyCalibration
+  updateSizeInfo();
+}
+
+function updateSizeInfo() {
+  if (!model) return;
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const el = document.getElementById('size-info');
+  if (el) {
+    el.innerHTML = `包围盒（缩放后）：<b>${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)}</b><br>` +
+      `baseScale=${baseScale.toFixed(3)} · userScale=${state.base.scale.toFixed(2)} · 最终=${(baseScale*state.base.scale).toFixed(3)}<br>` +
+      `autoOrient yawOffset=${yawOffset.toFixed(1)}°`;
+  }
+}
+
+// ====================================================================
+// 相机：追尾 / 座舱 + 右键自由视野（复刻 tune.js:189-235）
+// ====================================================================
+let camMode = 'chase';
+const freeView = { yaw: 0, pitch: 0, dist: 1, dragging: false, lx: 0, ly: 0 };
+const cockpitView = { yaw: 0, pitch: 0 };
+
+addEventListener('contextmenu', (e) => e.preventDefault());
+addEventListener('mousedown', (e) => {
+  if (e.button === 2) { freeView.dragging = true; freeView.lx = e.clientX; freeView.ly = e.clientY; }
+});
+addEventListener('mouseup', (e) => { if (e.button === 2) freeView.dragging = false; });
+addEventListener('mousemove', (e) => {
+  if (!freeView.dragging) return;
+  const dx = (e.clientX - freeView.lx) * 0.005;
+  const dy = (e.clientY - freeView.ly) * 0.005;
+  if (camMode === 'cockpit') {
+    cockpitView.yaw += dx; cockpitView.pitch -= dy;
+    cockpitView.pitch = Math.max(-0.9, Math.min(0.9, cockpitView.pitch));
+  } else {
+    freeView.yaw -= dx; freeView.pitch -= dy;
+    freeView.pitch = Math.max(-1.4, Math.min(1.4, freeView.pitch));
+  }
+  freeView.lx = e.clientX; freeView.ly = e.clientY;
+});
+addEventListener('wheel', (e) => {
+  if (camMode !== 'cockpit') {
+    freeView.dist *= e.deltaY > 0 ? 1.08 : 0.92;
+    freeView.dist = Math.max(0.3, Math.min(4, freeView.dist));
+  }
+}, { passive: true });
+
+function getForward() {
+  return new THREE.Vector3(0, 0, -1).applyQuaternion(root.quaternion);
+}
+
+const _fwd = new THREE.Vector3();
+const _off = new THREE.Vector3();
+const _lookAt = new THREE.Vector3();
+const _obs = new THREE.Quaternion();
+function updateCamera(dt) {
+  _obs.setFromEuler(new THREE.Euler(freeView.pitch, freeView.yaw, 0, 'YXZ'));
+  if (camMode === 'cockpit') {
+    // 座舱视角：COCKPIT_CFG 控制（复刻 GameRuntime.js:985-994）
+    _off.set(state.cockpit.x, state.cockpit.y, state.cockpit.z)
+      .applyQuaternion(root.quaternion).add(root.position);
+    camera.position.copy(_off);
+    _fwd.copy(getForward());
+    const cobs = new THREE.Quaternion().setFromEuler(new THREE.Euler(cockpitView.pitch, cockpitView.yaw, 0, 'YXZ'));
+    _fwd.applyQuaternion(cobs).multiplyScalar(state.cockpit.lookDist).add(_off);
+    camera.lookAt(_fwd);
+  } else {
+    // 追尾视角：CAM_OFFSETS.chase + 自由观察偏移 + lerp
+    const baseOff = new THREE.Vector3(state.chase.x, state.chase.y, state.chase.z).multiplyScalar(freeView.dist);
+    const off = baseOff.applyQuaternion(_obs).applyQuaternion(root.quaternion).add(root.position);
+    camera.position.lerp(off, 1 - Math.exp(-dt * 6));
+    _fwd.copy(getForward()).multiplyScalar(8).add(root.position);
+    camera.lookAt(_fwd);
+  }
+}
+
+// ====================================================================
+// 准星投影（复刻 tune.js:241-254 + GameRuntime.js:1024-1039）
+// 瞄准点 = 飞机位置 + forward*aimDist + up*(aimDist*aimLift)
+// ====================================================================
+const _aimP = new THREE.Vector3();
+const _proj = new THREE.Vector3();
+const _upOff = new THREE.Vector3();
+function updateCrosshair() {
+  const cross = document.getElementById('crosshair');
+  if (!cross) return;
+  // 座舱模式才显示准星（追尾也显示，但 aimLift=0）
+  const aimLift = (camMode === 'cockpit') ? state.cockpit.aimLift : 0;
+  _aimP.set(0, 0, -state.aimDist).applyQuaternion(root.quaternion).add(root.position);
+  if (aimLift) {
+    _upOff.set(0, 1, 0).applyQuaternion(root.quaternion).multiplyScalar(state.aimDist * aimLift);
+    _aimP.add(_upOff);
+  }
+  _proj.copy(_aimP).project(camera);
+  if (_proj.z > 1 || _proj.z < -1) { cross.style.display = 'none'; return; }
+  cross.style.display = '';
+  cross.style.left = ((_proj.x * 0.5 + 0.5) * innerWidth) + 'px';
+  cross.style.top = ((-_proj.y * 0.5 + 0.5) * innerHeight) + 'px';
+}
+
+// 动态注入准星 DOM（同 tune.html 样式）
+const crossEl = document.createElement('div');
+crossEl.id = 'crosshair';
+crossEl.innerHTML = '<div class="ring"></div><div class="dot"></div>';
+crossEl.style.cssText = 'position:fixed;top:50%;left:50%;width:56px;height:56px;transform:translate(-50%,-50%);opacity:.95;pointer-events:none;z-index:5;display:none;';
+const ringStyle = document.createElement('style');
+ringStyle.textContent = `
+#crosshair .ring{position:absolute;inset:0;border:1.5px solid rgba(255,90,77,.85);border-radius:50%;box-shadow:0 0 8px rgba(255,90,77,.5);}
+#crosshair .dot{position:absolute;top:50%;left:50%;width:3px;height:3px;border-radius:50%;background:#ff5a4d;transform:translate(-50%,-50%);box-shadow:0 0 6px rgba(255,90,77,.9);}
+#crosshair::before,#crosshair::after{content:"";position:absolute;background:rgba(255,90,77,.85);}
+#crosshair::before{left:50%;top:18%;width:1.5px;height:26%;transform:translateX(-50%);}
+#crosshair::after{top:50%;left:18%;height:1.5px;width:26%;transform:translateY(-50%);}`;
+document.head.appendChild(ringStyle);
+document.body.appendChild(crossEl);
+
+// ====================================================================
+// 主循环
+// ====================================================================
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (mixer) mixer.update(dt);
+  updateCamera(dt);
+  updateCrosshair();
+  renderer.render(scene, camera);
+}
+
+// ====================================================================
+// UI 绑定
+// ====================================================================
+const $ = (id) => document.getElementById(id);
+
+/** 双向绑定 range + number，改值回调 */
+function bindSlider(rangeId, numId, onChange) {
+  const r = $(rangeId), n = $(numId);
+  const apply = (val) => {
+    val = +val; if (Number.isNaN(val)) return;
+    r.value = val; n.value = val; onChange(val);
+  };
+  r.addEventListener('input', (e) => apply(e.target.value));
+  n.addEventListener('input', (e) => apply(e.target.value));
+  n.addEventListener('change', (e) => apply(e.target.value));
+}
+
+// ----- ① 机舱视角 -----
+bindSlider('ck-x', 'ck-x-n', (v) => { state.cockpit.x = v; });
+bindSlider('ck-y', 'ck-y-n', (v) => { state.cockpit.y = v; });
+bindSlider('ck-z', 'ck-z-n', (v) => { state.cockpit.z = v; });
+bindSlider('ck-look', 'ck-look-n', (v) => { state.cockpit.lookDist = v; });
+bindSlider('ck-lift', 'ck-lift-n', (v) => { state.cockpit.aimLift = v; });
+bindSlider('ch-x', 'ch-x-n', (v) => { state.chase.x = v; });
+bindSlider('ch-y', 'ch-y-n', (v) => { state.chase.y = v; });
+bindSlider('ch-z', 'ch-z-n', (v) => { state.chase.z = v; });
+bindSlider('ck-aimdist', 'ck-aimdist-n', (v) => { state.aimDist = v; });
+
+$('btn-reset-cockpit').addEventListener('click', () => {
+  Object.assign(state.cockpit, DEFAULTS.cockpit);
+  Object.assign(state.chase, DEFAULTS.chase);
+  state.aimDist = DEFAULTS.aimDist;
+  syncCockpitUI();
+});
+
+function syncCockpitUI() {
+  const map = [['ck-x','ck-x-n','x'],['ck-y','ck-y-n','y'],['ck-z','ck-z-n','z'],
+    ['ck-look','ck-look-n','lookDist'],['ck-lift','ck-lift-n','aimLift']];
+  map.forEach(([r,n,k]) => { $(r).value = state.cockpit[k]; $(n).value = state.cockpit[k]; });
+  [['ch-x','ch-x-n','x'],['ch-y','ch-y-n','y'],['ch-z','ch-z-n','z']].forEach(([r,n,k]) => {
+    $(r).value = state.chase[k]; $(n).value = state.chase[k];
+  });
+  $('ck-aimdist').value = state.aimDist; $('ck-aimdist-n').value = state.aimDist;
+}
+
+// ----- ② 枪口 -----
+muzzles.forEach((m, i) => {
+  ['x','y','z'].forEach((c) => {
+    bindSlider('mz' + i + '-' + c, 'mz' + i + '-' + c + '-n', (v) => { m[c] = v; updateMuzzleHelpers(); });
+  });
+});
+$('btn-markers').addEventListener('click', () => {
+  const btn = $('btn-markers'); btn.classList.toggle('active');
+  muzzleMarkers.forEach((b) => (b.visible = btn.classList.contains('active')));
+});
+$('btn-rays').addEventListener('click', () => {
+  const btn = $('btn-rays'); btn.classList.toggle('active');
+  rayLines.forEach((l) => (l.visible = btn.classList.contains('active')));
+});
+$('btn-reset-muzzle').addEventListener('click', () => {
+  DEFAULTS.muzzles.forEach((m, i) => { Object.assign(muzzles[i], m); });
+  syncMuzzleUI(); updateMuzzleHelpers();
+});
+function syncMuzzleUI() {
+  muzzles.forEach((m, i) => {
+    ['x','y','z'].forEach((c) => {
+      $('mz' + i + '-' + c).value = m[c]; $('mz' + i + '-' + c + '-n').value = m[c];
+    });
+  });
+}
+
+// ----- ③ 模型校准 -----
+$('auto-orient').addEventListener('change', (e) => {
+  state.base.autoOrient = e.target.checked; reapplyCalibration();
+});
+bindSlider('yaw', 'yaw-n', (v) => { state.base.yaw = v; if (!state.base.autoOrient) reapplyCalibration(); });
+bindSlider('pitch', 'pitch-n', (v) => { state.base.pitch = v; reapplyCalibration(); });
+bindSlider('roll', 'roll-n', (v) => { state.base.roll = v; reapplyCalibration(); });
+bindSlider('scale', 'scale-n', (v) => { state.base.scale = v; reapplyCalibration(); });
+bindSlider('cx', 'cx-n', (v) => { state.base.cx = v; reapplyCalibration(); });
+bindSlider('cy', 'cy-n', (v) => { state.base.cy = v; reapplyCalibration(); });
+bindSlider('cz', 'cz-n', (v) => { state.base.cz = v; reapplyCalibration(); });
+$('btn-reset-base').addEventListener('click', () => {
+  Object.assign(state.base, DEFAULTS.base); syncBaseUI(); reapplyCalibration();
+});
+function syncBaseUI() {
+  $('auto-orient').checked = state.base.autoOrient;
+  [['yaw','yaw-n','yaw'],['pitch','pitch-n','pitch'],['roll','roll-n','roll'],['scale','scale-n','scale'],
+   ['cx','cx-n','cx'],['cy','cy-n','cy'],['cz','cz-n','cz']].forEach(([r,n,k]) => {
+    $(r).value = state.base[k]; $(n).value = state.base[k];
+  });
+}
+
+// ----- ④ 飞行物理（仅记录，静态场景无视觉效果）-----
+const physMap = [
+  ['p-maxspd','p-maxspd-n','maxSpeed'],['p-minspd','p-minspd-n','minSpeed'],['p-cruise','p-cruise-n','cruiseSpeed'],
+  ['p-pmax','p-pmax-n','pitchMax'],['p-presp','p-presp-n','pitchResp'],
+  ['p-rmax','p-rmax-n','rollMax'],['p-rresp','p-rresp-n','rollResp'],
+  ['p-ymax','p-ymax-n','yawMax'],['p-yresp','p-yresp-n','yawResp'],
+  ['p-grav','p-grav-n','gravity'],['p-liftk','p-liftk-n','liftK'],['p-stall','p-stall-n','stallThreshold'],
+];
+physMap.forEach(([r,n,k]) => bindSlider(r, n, (v) => { state.phys[k] = v; }));
+$('p-gravity').addEventListener('change', (e) => { state.phys.enableGravity = e.target.checked; });
+$('p-coupling').addEventListener('change', (e) => { state.phys.enableCoupling = e.target.checked; });
+$('btn-reset-phys').addEventListener('click', () => {
+  Object.assign(state.phys, DEFAULTS.phys); syncPhysUI();
+});
+function syncPhysUI() {
+  physMap.forEach(([r,n,k]) => { $(r).value = state.phys[k]; $(n).value = state.phys[k]; });
+  $('p-gravity').checked = state.phys.enableGravity;
+  $('p-coupling').checked = state.phys.enableCoupling;
+}
+
+// ----- 顶栏：桨模式 / 起落架 / 包围盒 / 世界轴 -----
+function setPropMode(m) {
+  propMode = m;
+  ['blur','anim','slow'].forEach((k) => $('btn-prop-' + k).classList.toggle('active', k === m));
+  applyPropMode();
+}
+$('btn-prop-blur').addEventListener('click', () => setPropMode('blur'));
+$('btn-prop-anim').addEventListener('click', () => setPropMode('anim'));
+$('btn-prop-slow').addEventListener('click', () => setPropMode('slow'));
+
+$('btn-gear').addEventListener('click', () => {
+  const btn = $('btn-gear'); btn.classList.toggle('active');
+  const show = btn.classList.contains('active');
+  // 起落架关键词匹配（Bf 109 不藏起落架，仅 visibility 预览）
+  if (!model) return;
+  const GEAR_KEYWORDS = ['gear', 'landing', 'wheel', '轮', '起落架'];
+  model.traverse((o) => {
+    if (o.name && GEAR_KEYWORDS.some(k => o.name.toLowerCase().includes(k))) {
+      o.visible = show;
+    }
+  });
+});
+
+$('btn-bbox').addEventListener('click', () => {
+  const btn = $('btn-bbox'); btn.classList.toggle('active');
+  if (btn.classList.contains('active')) {
+    if (!bboxHelper && model) { bboxHelper = new THREE.BoxHelper(model, 0x6fd0ff); scene.add(bboxHelper); }
+    if (bboxHelper) bboxHelper.visible = true;
+  } else {
+    if (bboxHelper) bboxHelper.visible = false;
+  }
+});
+
+$('btn-axis').addEventListener('click', () => {
+  const btn = $('btn-axis'); btn.classList.toggle('active');
+  worldAxis.visible = btn.classList.contains('active');
+});
+// 默认世界轴隐藏
+worldAxis.visible = false;
+$('btn-axis').classList.remove('active');
+
+// ----- 视角切换 -----
+function setCam(m) {
+  camMode = m;
+  ['chase','cockpit'].forEach((k) => $('btn-cam-' + k).classList.toggle('active', k === m));
+  if (m === 'cockpit') { cockpitView.yaw = 0; cockpitView.pitch = 0; }
+  freeView.yaw = 0; freeView.pitch = 0; freeView.dist = 1;
+}
+['chase','cockpit'].forEach((m) => $('btn-cam-' + m).addEventListener('click', () => setCam(m)));
+addEventListener('keydown', (e) => { if (e.code === 'KeyC') setCam(camMode === 'chase' ? 'cockpit' : 'chase'); });
+
+// ----- Tab 切换 -----
+document.querySelectorAll('.tabs button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.tab-content').forEach((c) => c.classList.toggle('active', c.id === 'tab-' + tab));
+  });
+});
+
+// ====================================================================
+// 导出系统
+// ====================================================================
+function fmtVec(v, prec = 2) {
+  const sx = (v.x >= 0 ? ' ' : '') + v.x.toFixed(prec);
+  const sy = v.y.toFixed(prec);
+  const sz = (v.z >= 0 ? ' ' : '') + v.z.toFixed(prec);
+  return `new THREE.Vector3(${sx}, ${sy}, ${sz})`;
+}
+
+function exportAircraft() {
+  const p = state.phys, b = state.base;
+  const muzLines = muzzles.map(m => `  ${fmtVec({x:m.x,y:m.y,z:m.z}, 2)},  // ${m.name}`);
+  const hasCenter = (Math.abs(b.cx)+Math.abs(b.cy)+Math.abs(b.cz) > 0.01);
+  return `// ════════════════════════════════════════════════════════════
+// 片段 A -> js/aircraft.js · Aircraft 类构造函数（约 124-196 行）
+// 替换对应字段的默认值。aimLift 构造函数保持 0（运行时由 GameRuntime 按视角覆盖）。
+// ════════════════════════════════════════════════════════════
+
+// 飞行物理（aircraft.js:124-196）
+this.maxSpeed = ${p.maxSpeed};    // 约 ${Math.round(p.maxSpeed*3.6)} km/h
+this.minSpeed = ${p.minSpeed};
+this.cruiseSpeed = ${p.cruiseSpeed};
+this.pitchMax = ${p.pitchMax};   this.pitchResp = ${p.pitchResp.toFixed(1)};
+this.rollMax  = ${p.rollMax.toFixed(2)};  this.rollResp  = ${p.rollResp.toFixed(1)};
+this.yawMax   = ${p.yawMax.toFixed(2)};   this.yawResp   = ${p.yawResp.toFixed(1)};
+this.gravity = ${p.gravity.toFixed(1)};       // 场景单位/s²
+this.liftK = ${p.liftK.toFixed(3)};       // lift = speed * liftK
+this.stallThreshold = ${p.stallThreshold};
+this.enableGravity = ${p.enableGravity};
+this.enableCoupling = ${p.enableCoupling};
+
+// 校准（aircraft.js:129-135）
+this.yawOffset = ${b.yaw.toFixed(1)};
+this.pitchOffset = ${b.pitch.toFixed(1)};
+this.rollOffset = ${b.roll.toFixed(1)};
+this.autoOrient = ${b.autoOrient};
+this.userScale = ${b.scale.toFixed(2)};
+${hasCenter
+  ? `this.centerOffset = [${b.cx.toFixed(2)}, ${b.cy.toFixed(2)}, ${b.cz.toFixed(2)}]; // body frame 世界单位`
+  : `this.centerOffset = null;`}
+
+// 枪口位置（aircraft.js:162-167，body frame，机头=-Z，userScale 缩放后）
+this.muzzleOffsets = [
+${muzLines.join('\n')}
+];
+
+// aimLift 构造函数保持 0（运行时由 GameRuntime 按视角覆盖：座舱=AIM_LIFT_COCKPIT，其它=0）
+this.aimLift = 0;`;
+}
+
+function exportRuntime() {
+  const c = state.cockpit, ch = state.chase;
+  return `// ════════════════════════════════════════════════════════════
+// 片段 B -> js/game/GameRuntime.js · 顶部常量（约 39-45 行）+ updateCrosshair 局部（约 1030 行）
+// ════════════════════════════════════════════════════════════
+
+// GameRuntime.js 顶部常量（约 39-45 行）
+const CAM_OFFSETS = {
+  chase:      new THREE.Vector3(${ch.x.toFixed(2)}, ${ch.y.toFixed(2)}, ${ch.z.toFixed(2)}),
+  rearLeft:   new THREE.Vector3(-8, 3.0, 10),    // 观察视角（不变）
+  frontRight: new THREE.Vector3(7, 2.0, -10),    // 观察视角（不变）
+  top:        new THREE.Vector3(0, 16, 0.5),     // 观察视角（不变）
+};
+const COCKPIT_CFG = { x: ${c.x.toFixed(2)}, y: ${c.y.toFixed(2)}, z: ${c.z.toFixed(2)}, lookDist: ${c.lookDist} };
+const AIM_LIFT_COCKPIT = ${c.aimLift.toFixed(3)};
+
+// GameRuntime.js:1030 updateCrosshair 内的局部常量（准星投影距离，仅影响准星位置不影响弹道）
+const aimDist = ${state.aimDist};`;
+}
+
+function exportAll() {
+  return exportAircraft() + '\n\n\n' + exportRuntime();
+}
+
+let currentExport = 'all';
+function refreshExport() {
+  const txt = currentExport === 'all' ? exportAll()
+    : currentExport === 'aircraft' ? exportAircraft()
+    : exportRuntime();
+  $('export-text').value = txt;
+  document.querySelectorAll('.export-tabs button').forEach(b => b.classList.toggle('active', b.dataset.export === currentExport));
+}
+
+$('btn-export').addEventListener('click', () => {
+  refreshExport();
+  $('export-modal').classList.add('show');
+});
+document.querySelectorAll('.export-tabs button').forEach((b) => {
+  b.addEventListener('click', () => { currentExport = b.dataset.export; refreshExport(); });
+});
+$('btn-copy-export').addEventListener('click', () => {
+  navigator.clipboard.writeText($('export-text').value).then(() => {
+    const btn = $('btn-copy-export'); btn.textContent = '已复制 ✓';
+    setTimeout(() => (btn.textContent = '复制'), 1500);
+  });
+});
+$('btn-close-export').addEventListener('click', () => $('export-modal').classList.remove('show'));
+
+// ====================================================================
+// 状态条
+// ====================================================================
+function setStatus(msg, kind) {
+  const el = $('status');
+  el.textContent = msg;
+  el.className = kind || '';
+}
+
+// ====================================================================
+// 自适应
+// ====================================================================
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ====================================================================
+// 启动
+// ====================================================================
+syncCockpitUI(); syncMuzzleUI(); syncBaseUI(); syncPhysUI();
+loadModel().then(() => { animate(); }).catch((err) => {
+  document.getElementById('loader-err').textContent = '加载失败：' + (err.message || err);
+  setStatus('加载失败：' + (err.message || err), 'err');
+});
+</script>
+</body>
+</html>

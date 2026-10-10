@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>火炮位置调试台</title>
+<style>
+  :root {
+    --panel: rgba(12, 18, 22, 0.85);
+    --line: rgba(120, 180, 210, 0.3);
+    --accent: #6fd0ff;
+    --warn: #ffb84d;
+    --fire: #ff5a4d;
+    --text: #d7e6ee;
+    --muted: #8aa0ad;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #05080a; color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
+  #scene { display: block; width: 100vw; height: 100vh; }
+
+  #panel {
+    position: fixed; top: 14px; right: 14px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; width: 340px; max-height: calc(100vh - 28px); overflow: auto;
+    font-size: 12px; backdrop-filter: blur(6px);
+  }
+  #panel h4 { color: var(--accent); letter-spacing: 1px; margin: 14px 0 6px; font-size: 12px; }
+  #panel h4:first-child { margin-top: 0; }
+  #panel .muz-group { border-left: 2px solid rgba(111,208,255,.25); padding-left: 8px; margin-bottom: 6px; }
+  #panel .muz-name { color: var(--fire); font-size: 11px; margin-bottom: 2px; }
+  #panel label { display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; margin: 3px 0; color: var(--muted); }
+  #panel input[type=range] { width: 150px; vertical-align: middle; }
+  #panel input[type=number] {
+    width: 56px; background: rgba(0,0,0,.3); border: 1px solid var(--line); color: var(--accent);
+    border-radius: 3px; padding: 2px 4px; font-size: 11px; font-family: "Consolas", monospace;
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  #panel input[type=number]:focus { outline: none; border-color: var(--accent); }
+  #panel .btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  #panel button {
+    background: rgba(111,208,255,.1); border: 1px solid var(--line); color: var(--text);
+    border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; font-family: inherit;
+  }
+  #panel button:hover { background: rgba(111,208,255,.22); }
+  #panel button.active { background: rgba(111,208,255,.35); color: #06141b; }
+  #panel .hint { font-size: 10px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+
+  #output {
+    position: fixed; left: 14px; bottom: 14px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 12px; width: 420px; font-size: 11px; backdrop-filter: blur(6px);
+  }
+  #output h4 { color: var(--warn); letter-spacing: 1px; margin-bottom: 6px; font-size: 11px; }
+  #output pre { color: var(--accent); font-family: "Consolas", monospace; font-size: 11px;
+    white-space: pre; line-height: 1.6; }
+  #output button { margin-top: 6px; }
+
+  /* 准星（红色，调试用）*/
+  #crosshair { position: fixed; top: 50%; left: 50%; width: 56px; height: 56px;
+    transform: translate(-50%, -50%); opacity: .95; pointer-events: none; z-index: 5; will-change: left, top; }
+  #crosshair .ring { position: absolute; inset: 0; border: 1.5px solid rgba(255,90,77,.85);
+    border-radius: 50%; box-shadow: 0 0 8px rgba(255,90,77,.5); }
+  #crosshair .dot { position: absolute; top: 50%; left: 50%; width: 3px; height: 3px; border-radius: 50%;
+    background: var(--fire); transform: translate(-50%,-50%); box-shadow: 0 0 6px rgba(255,90,77,.9); }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: rgba(255,90,77,.85); }
+  #crosshair::before { left: 50%; top: 18%; width: 1.5px; height: 26%; transform: translateX(-50%); }
+  #crosshair::after { top: 50%; left: 18%; height: 1.5px; width: 26%; transform: translateY(-50%); }
+
+  #topbar { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 11;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 20px;
+    padding: 6px 16px; font-size: 12px; color: var(--accent); letter-spacing: 2px; }
+  #topbar small { color: var(--muted); letter-spacing: 0; margin-left: 8px; }
+
+  #loader { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 40%, #122029, #05080a 70%); transition: opacity .6s; }
+  #loader.hide { opacity: 0; pointer-events: none; }
+  #loader .title { font-size: 22px; letter-spacing: 4px; color: var(--accent); margin-bottom: 18px; }
+  #loader .sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+  .bar { width: 320px; max-width: 70vw; height: 6px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #6fd0ff, #2a8fd0); }
+  #loader .pct { margin-top: 12px; font-size: 12px; color: var(--muted); }
+  #loader .err { margin-top: 16px; color: var(--fire); font-size: 12px; max-width: 80vw; text-align: center; }
+</style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <div id="topbar">火炮位置调试台 <small id="topbar-sub">载入中…</small></div>
+  <div id="crosshair"><div class="ring"></div><div class="dot"></div></div>
+
+  <div id="panel">
+    <h4>火炮枪口位置（body frame，机头=-Z）</h4>
+    <div class="muz-group">
+      <div class="muz-name">右机翼</div>
+      <label>X <input type="range" id="mz0-x" min="-8" max="8" value="7.80" step="0.05"><input type="number" id="mz0-x-n" min="-8" max="8" value="7.80" step="0.05"></label>
+      <label>Y <input type="range" id="mz0-y" min="-2" max="4" value="-0.95" step="0.05"><input type="number" id="mz0-y-n" min="-2" max="4" value="-0.95" step="0.05"></label>
+      <label>Z <input type="range" id="mz0-z" min="-8" max="2" value="-6.15" step="0.05"><input type="number" id="mz0-z-n" min="-8" max="2" value="-6.15" step="0.05"></label>
+    </div>
+    <div class="muz-group">
+      <div class="muz-name">左机翼</div>
+      <label>X <input type="range" id="mz1-x" min="-8" max="8" value="-7.85" step="0.05"><input type="number" id="mz1-x-n" min="-8" max="8" value="-7.85" step="0.05"></label>
+      <label>Y <input type="range" id="mz1-y" min="-2" max="4" value="-0.95" step="0.05"><input type="number" id="mz1-y-n" min="-2" max="4" value="-0.95" step="0.05"></label>
+      <label>Z <input type="range" id="mz1-z" min="-8" max="2" value="-6.25" step="0.05"><input type="number" id="mz1-z-n" min="-8" max="2" value="-6.25" step="0.05"></label>
+    </div>
+    <div class="muz-group">
+      <div class="muz-name">右机头</div>
+      <label>X <input type="range" id="mz2-x" min="-8" max="8" value="0.60" step="0.05"><input type="number" id="mz2-x-n" min="-8" max="8" value="0.60" step="0.05"></label>
+      <label>Y <input type="range" id="mz2-y" min="-2" max="4" value="1.35" step="0.05"><input type="number" id="mz2-y-n" min="-2" max="4" value="1.35" step="0.05"></label>
+      <label>Z <input type="range" id="mz2-z" min="-8" max="2" value="-6.45" step="0.05"><input type="number" id="mz2-z-n" min="-8" max="2" value="-6.45" step="0.05"></label>
+    </div>
+    <div class="muz-group">
+      <div class="muz-name">左机头</div>
+      <label>X <input type="range" id="mz3-x" min="-8" max="8" value="-0.60" step="0.05"><input type="number" id="mz3-x-n" min="-8" max="8" value="-0.60" step="0.05"></label>
+      <label>Y <input type="range" id="mz3-y" min="-2" max="4" value="1.35" step="0.05"><input type="number" id="mz3-y-n" min="-2" max="4" value="1.35" step="0.05"></label>
+      <label>Z <input type="range" id="mz3-z" min="-8" max="2" value="-6.45" step="0.05"><input type="number" id="mz3-z-n" min="-8" max="2" value="-6.45" step="0.05"></label>
+    </div>
+    <div class="btns">
+      <button id="btn-markers" class="active">枪口标记</button>
+      <button id="btn-rays" class="active">弹道射线</button>
+    </div>
+    <div class="hint">红球=枪口位置；红线=子弹方向（沿机头 -Z）。调到红球贴合模型枪口即可。</div>
+
+    <h4>准星</h4>
+    <label>瞄准距离 <input type="range" id="aim-dist" min="200" max="3000" value="1600" step="50"><input type="number" id="aim-dist-n" min="200" max="3000" value="1600" step="50"></label>
+    <label>座舱上抬 <input type="range" id="aim-lift" min="0" max="0.3" value="0.12" step="0.01"><input type="number" id="aim-lift-n" min="0" max="0.3" value="0.12" step="0.01"></label>
+    <div class="hint">座舱视角下准星上抬比例（避免被机头遮挡）。</div>
+
+    <h4>视角</h4>
+    <div class="btns">
+      <button id="btn-cam-chase" class="active">追尾</button>
+      <button id="btn-cam-cockpit">座舱</button>
+    </div>
+    <div class="hint">C 键切换 · 外部视角右键拖拽绕飞机观察 · 滚轮缩放 · 座舱内右键调整视野</div>
+  </div>
+
+  <div id="output">
+    <h4>枪口参数（调好后复制到 aircraft.js）</h4>
+    <pre id="out-pre">载入中…</pre>
+    <button id="btn-copy">复制参数</button>
+  </div>
+
+  <div id="loader">
+    <div class="title">TUNE · Bf 109 E-4</div>
+    <div class="sub">加载调试模型…</div>
+    <div class="bar"><i id="loader-fill"></i></div>
+    <div class="pct" id="loader-pct">0%</div>
+    <div class="err" id="loader-err"></div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/node_modules/three/build/three.module.js",
+      "three/addons/": "/node_modules/three/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="./js/tune.js"></script>
+</body>
+</html>

@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yak 模型调整台 · 节点/朝向</title>
+<style>
+  :root {
+    --panel: rgba(12, 18, 22, 0.92);
+    --line: rgba(120, 180, 210, 0.3);
+    --accent: #6fd0ff;
+    --warn: #ffb84d;
+    --fire: #ff5a4d;
+    --text: #d7e6ee;
+    --muted: #8aa0ad;
+    --gear: #ff5a4d;
+    --prop: #6fff8a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #05080a; color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; font-size: 13px; }
+  #canvas-wrap { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; }
+  #scene { display: block; width: 100%; height: 100%; }
+
+  /* 顶部 */
+  #topbar { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 22px;
+    padding: 6px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; max-width: 95vw; }
+  #topbar label { color: var(--muted); font-size: 12px; }
+  #topbar select { background: rgba(0,0,0,.4); color: var(--accent); border: 1px solid var(--line);
+    border-radius: 4px; padding: 4px 8px; font-size: 13px; cursor: pointer; }
+  #topbar button { background: rgba(111,208,255,.1); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--text); padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  #topbar button:hover { background: rgba(111,208,255,.2); }
+  #topbar button.warn { color: var(--gear); border-color: rgba(255,90,77,.4); }
+  #topbar button.prop { color: var(--prop); border-color: rgba(111,255,138,.4); }
+  #topbar button.go { background: var(--accent); color: #05080a; font-weight: 600; }
+
+  /* 左侧节点列表 */
+  #node-panel { position: fixed; top: 60px; left: 12px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    width: 340px; max-height: calc(100vh - 80px); display: flex; flex-direction: column; }
+  #node-panel .header { padding: 8px 12px; border-bottom: 1px solid var(--line);
+    color: var(--accent); font-size: 12px; letter-spacing: 1px; }
+  #node-panel .toolbar { padding: 6px 12px; border-bottom: 1px solid var(--line);
+    display: flex; gap: 6px; flex-wrap: wrap; }
+  #node-panel .toolbar button { background: rgba(255,255,255,.05); border: 1px solid var(--line);
+    border-radius: 3px; color: var(--muted); padding: 2px 8px; font-size: 11px; cursor: pointer; }
+  #node-panel .toolbar button:hover { background: rgba(111,208,255,.15); color: var(--accent); }
+  #node-list { flex: 1; overflow-y: auto; padding: 4px 0; max-height: calc(100vh - 200px); }
+  .node-row { padding: 4px 12px; display: flex; align-items: center; gap: 6px;
+    cursor: pointer; border-bottom: 1px solid rgba(120,180,210,.08); }
+  .node-row:hover { background: rgba(111,208,255,.08); }
+  .node-row.selected { background: rgba(111,208,255,.18); }
+  .node-row.gear { background: rgba(255,90,77,.12); }
+  .node-row.gear.selected { background: rgba(255,90,77,.25); }
+  .node-row.prop { background: rgba(111,255,138,.10); }
+  .node-row.prop.selected { background: rgba(111,255,138,.20); }
+  .node-row input[type=checkbox] { margin: 0; cursor: pointer; }
+  .node-row .name { flex: 1; font-family: Consolas, monospace; font-size: 11px; color: var(--text); }
+  .node-row .info { color: var(--muted); font-size: 10px; font-family: Consolas, monospace; }
+  .node-row .tag { font-size: 9px; padding: 1px 4px; border-radius: 2px; }
+  .tag.gear { background: var(--gear); color: #fff; }
+  .tag.prop { background: var(--prop); color: #05080a; }
+
+  /* 右上 朝向面板 */
+  #orient-panel { position: fixed; top: 60px; right: 12px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    width: 320px; padding: 12px; }
+  #orient-panel h4 { color: var(--accent); font-size: 12px; margin-bottom: 8px; letter-spacing: 1px; }
+  .ctrl { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12px; }
+  .ctrl label { width: 80px; color: var(--muted); }
+  .ctrl input[type=range] { flex: 1; }
+  .ctrl .val { width: 56px; text-align: right; color: var(--accent);
+    font-family: Consolas, monospace; font-variant-numeric: tabular-nums; }
+  .ctrl select { flex: 1; background: rgba(0,0,0,.4); color: var(--accent);
+    border: 1px solid var(--line); border-radius: 3px; padding: 2px 6px; font-size: 12px; }
+  #orient-panel .row { display: flex; gap: 6px; margin-top: 8px; }
+  #orient-panel button { background: rgba(111,208,255,.1); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--text); padding: 4px 10px; font-size: 11px; cursor: pointer; flex: 1; }
+  #orient-panel button:hover { background: rgba(111,208,255,.2); }
+  #orient-panel button.go { background: var(--accent); color: #05080a; font-weight: 600; }
+
+  /* 右下 导出面板 */
+  #export-panel { position: fixed; bottom: 12px; right: 12px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    width: 320px; padding: 10px; }
+  #export-panel h4 { color: var(--accent); font-size: 12px; margin-bottom: 6px; }
+  #export-text { width: 100%; height: 100px; background: rgba(0,0,0,.5); border: 1px solid var(--line);
+    color: #b8e0ff; font: 11px Consolas, monospace; padding: 6px; border-radius: 4px; resize: vertical; }
+  #export-panel .actions { display: flex; gap: 6px; margin-top: 6px; }
+  #export-panel button { background: rgba(111,208,255,.1); border: 1px solid var(--line);
+    border-radius: 4px; color: var(--text); padding: 4px 10px; font-size: 11px; cursor: pointer; flex: 1; }
+  #export-panel button:hover { background: rgba(111,208,255,.2); }
+
+  /* 加载 */
+  #loader { position: fixed; inset: 0; z-index: 50; background: rgba(5,8,10,.85);
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    color: var(--accent); letter-spacing: 4px; }
+  #loader.hide { display: none; }
+  .bar { width: 240px; height: 4px; background: rgba(255,255,255,.08); margin-top: 14px;
+    border-radius: 2px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0%; background: var(--accent); transition: width .2s; }
+
+  /* 提示 */
+  #hint { position: fixed; bottom: 12px; left: 12px; z-index: 10; max-width: 340px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 12px; font-size: 11px; color: var(--muted); line-height: 1.6; }
+  #hint b { color: var(--accent); }
+  #hint .gear { color: var(--gear); }
+  #hint .prop { color: var(--prop); }
+</style>
+</head>
+<body>
+<div id="canvas-wrap"><canvas id="scene"></canvas></div>
+
+<div id="topbar">
+  <label>模型：</label>
+  <select id="model-select">
+    <option value="/model/yak1.glb">Yak-1</option>
+    <option value="/model/yak3.glb">Yak-3</option>
+    <option value="/model/yak7.glb">Yak-7</option>
+    <option value="/model/spitfire.glb">Spitfire (2.3MB)</option>
+  </select>
+  <button class="warn" id="btn-mark-gear">标记起落架</button>
+  <button class="prop" id="btn-mark-prop">标记螺旋桨</button>
+  <button id="btn-clear">清除标记</button>
+  <button class="go" id="btn-export">导出配置</button>
+</div>
+
+<div id="node-panel">
+  <div class="header">节点列表（按 Y 坐标升序）</div>
+  <div class="toolbar">
+    <button id="btn-sort-y">按 Y 排序</button>
+    <button id="btn-sort-name">按名称排序</button>
+    <button id="btn-show-all">显示全部</button>
+    <button id="btn-hide-low-y">隐藏 Y&lt;0.3</button>
+  </div>
+  <div id="node-list"></div>
+</div>
+
+<div id="orient-panel">
+  <h4>朝向调整（实时应用）</h4>
+  <div class="ctrl">
+    <label>yawOffset</label>
+    <input type="range" id="yaw-slider" min="-180" max="360" step="0.5" value="0">
+    <span class="val" id="yaw-val">0°</span>
+  </div>
+  <div class="ctrl">
+    <label>pitchOffset</label>
+    <input type="range" id="pitch-slider" min="-45" max="45" step="0.5" value="0">
+    <span class="val" id="pitch-val">0°</span>
+  </div>
+  <div class="ctrl">
+    <label>rollOffset</label>
+    <input type="range" id="roll-slider" min="-45" max="45" step="0.5" value="0">
+    <span class="val" id="roll-val">0°</span>
+  </div>
+  <div class="ctrl">
+    <label>参考飞机</label>
+    <select id="ref-select">
+      <option value="">无</option>
+      <option value="/model/yak9.glb">Yak-9（autoOrient:false, yaw:-139）</option>
+      <option value="/model/bf109_opt.glb">Bf 109 E-4（玩家基准）</option>
+      <option value="/model/i153.glb">I-153</option>
+      <option value="/model/i16.glb">I-16</option>
+      <option value="/model/spitfire.glb">Spitfire</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>参考透明度</label>
+    <input type="range" id="ref-opacity" min="0.1" max="1" step="0.05" value="0.4">
+    <span class="val" id="ref-opacity-val">0.40</span>
+  </div>
+  <div class="row">
+    <button id="btn-auto-orient">应用 _autoOrient</button>
+    <button id="btn-reset-orient">重置朝向</button>
+    <button class="go" id="btn-show-arrow">隐藏箭头</button>
+  </div>
+</div>
+
+<div id="export-panel">
+  <h4>导出配置（复制给我）</h4>
+  <textarea id="export-text" readonly></textarea>
+  <div class="actions">
+    <button id="btn-copy">复制</button>
+    <button id="btn-select-all">全选</button>
+  </div>
+</div>
+
+<div id="hint">
+  <b>使用说明</b><br>
+  1. 顶部切换模型；右上调整朝向（实时应用）<br>
+  2. 青色箭头 = 机头应朝向（-Z），飞机机头应正对箭头<br>
+  3. "参考飞机"加载一架半透明对比机叠加在原点<br>
+  4. 左侧节点列表点击高亮 + checkbox 显隐；<span class="gear">标记起落架</span> / <span class="prop">标记螺旋桨</span><br>
+  5. 调好后点 <b>导出配置</b> 复制 JSON 给我
+</div>
+
+<div id="loader">
+  <div>加载模型中...</div>
+  <div class="bar"><i id="bar-fill"></i></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/node_modules/three/build/three.module.js",
+    "three/addons/": "/node_modules/three/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// 与 enemy.js MODEL_CONFIGS 同步的配置（用于 _autoOrient 计算）
+const MODEL_CONFIGS = {
+  '/model/yak1.glb': {
+    autoOrient: true, userScale: 3.63, hideGear: true,
+    hideGearNodes: ['Line27-FACES_1','Line26-FACES_1','Line25-FACES_1','Torus08-FACES_1',
+      'Cylinder28-FACES_1','Line08-FACES_1','Line09-FACES_1','Line03-FACES_1',
+      'Torus06-FACES_1','stv_gl1-FACES_1','stv_gl2-FACES_1','Line20-FACES_1',
+      'Line04-FACES_1','Line19-FACES_1','Line02-FACES_1','stv_gl04-FACES_1',
+      'Line24-FACES_1','Line23-FACES_1','Line22-FACES_1','Line21-FACES_1',
+      'stv_gl03-FACES_1','Cylinder26-FACES_1'],
+    propNodes: ['Line16-FACES_1','Line17-FACES_1','Line05-FACES_1'],
+  },
+  '/model/yak3.glb': {
+    autoOrient: true, userScale: 3.34, hideGear: true,
+    hideGearNodes: ['Object06-FACES_1','Object05-FACES_1','stvgl01-FACES_1','stvgl-FACES_1',
+      'Object04-FACES_1','Object03-FACES_1','Line45-FACES_1','Line44-FACES_1',
+      'Line43-FACES_1','Cylinder32-FACES_1','Line42-FACES_1','Line41-FACES_1',
+      'Line40-FACES_1','Torus09-FACES_1','Line26-FACES_1','Line21-FACES_1',
+      'Line27-FACES_1','Torus08-FACES_1','Cylinder28-FACES_1','Line24-FACES_1',
+      'Line22-FACES_1','Line25-FACES_1'],
+    propNodes: ['Line30-FACES_1','Line29-FACES_1','Line05-FACES_1'],
+  },
+  '/model/yak7.glb': {
+    autoOrient: true, userScale: 3.63,
+  },
+  // 喷火 Spitfire（第二关英军主力，2.3MB 精细版）
+  // 与 enemy.js MODEL_CONFIGS 一致：手工朝向 + 3 螺旋桨节点 + 17 起落架节点
+  '/model/spitfire.glb': {
+    autoOrient: false, yawOffset: -124.5, userScale: 4.08,
+    hideGearNodes: [
+      'Object03-FACES_1','Cylinder07-FACES_1','Cylinder01-FACES_1','Cylinder06-FACES_1',
+      'Torus01-FACES_1','Cylinder05-FACES_1','Cylinder82-FACES_1','Cylinder83-FACES_1',
+      'Torus04-FACES_1','Cylinder84-FACES_1','Cylinder81-FACES_1','Object02-FACES_1',
+      'Cylinder80-FACES_1','Cylinder20-FACES_1','Cylinder02-FACES_1','Torus03-FACES_1',
+      'Cylinder16-FACES_1',
+    ],
+    propNodes: ['Cylinder78-FACES_1','Cylinder79-FACES_1','Cylinder77-FACES_1'],
+  },
+  // 参考飞机配置（用真实校准值显示）
+  '/model/yak9.glb': {
+    autoOrient: false, yawOffset: -139, userScale: 3.52,
+  },
+  '/model/bf109_opt.glb': {
+    autoOrient: true, userScale: 3.6,
+  },
+  '/model/i153.glb': {
+    autoOrient: true, userScale: 3.54,
+  },
+  '/model/i16.glb': {
+    autoOrient: true, userScale: 3.27,
+  },
+};
+
+const PROP_KEYWORDS = ['prop', '螺旋桨', 'airscrew', 'propeller', 'vint', 'винт'];
+
+function isPropName(name) {
+  if (!name) return false;
+  const n = String(name).toLowerCase();
+  return PROP_KEYWORDS.some((k) => n.includes(k));
+}
+
+// ====== Three.js ======
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a1218);
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
+camera.position.set(10, 4, 12);
+const controls = new OrbitControls(camera, canvas);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
+const dir = new THREE.DirectionalLight(0xffffff, 1.0); dir.position.set(10, 20, 10); scene.add(dir);
+// 网格地面
+const grid = new THREE.GridHelper(20, 20, 0x2a4a55, 0x1a2a30);
+grid.position.y = -3;
+scene.add(grid);
+// forward 箭头：从原点指向 -Z（机头方向）
+const arrow = new THREE.ArrowHelper(
+  new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0, 0), 5, 0x6fd0ff, 1.2, 0.6
+);
+scene.add(arrow);
+
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ====== 全局状态 ======
+const state = {
+  currentUrl: null,
+  currentModel: null,           // THREE.Group（待调模型）
+  currentModelYaw: null,        // 包裹 currentModel 的 Group（应用 yawOffset 用）
+  refModel: null,               // 参考飞机 THREE.Group
+  refModelYaw: null,
+  nodes: [],
+  selectedName: null,
+  sortOrder: 'y',
+  yawOffset: 0,
+  pitchOffset: 0,
+  rollOffset: 0,
+  showArrow: true,
+};
+
+// ====== _autoOrient 算法（与 aircraft.js 完全同步）======
+// 关键：使用 Box3.setFromObject(o).getCenter() 取几何中心，
+// 而非 getWorldPosition（transform 原点可能与几何中心偏离，导致朝向算反）
+function computeAutoOrient(model, cfg) {
+  if (!cfg || cfg.autoOrient === false) return cfg ? cfg.yawOffset || 0 : 0;
+  model.updateWorldMatrix(true, true);
+  const propNodes = [];
+  if (cfg.propNodes && cfg.propNodes.length) {
+    const set = new Set(cfg.propNodes);
+    model.traverse((o) => { if (o.name && set.has(o.name)) propNodes.push(o); });
+  } else {
+    model.traverse((o) => { if (isPropName(o.name)) propNodes.push(o); });
+  }
+  if (!propNodes.length) return cfg.yawOffset || 0;
+  const c = new THREE.Vector3();
+  const tmpBox = new THREE.Box3();
+  const tmpCenter = new THREE.Vector3();
+  propNodes.forEach((o) => {
+    tmpBox.setFromObject(o);
+    tmpBox.getCenter(tmpCenter);
+    c.add(tmpCenter);
+  });
+  c.divideScalar(propNodes.length);
+  const nx = c.x, nz = c.z;
+  if (Math.hypot(nx, nz) < 1e-3) return cfg.yawOffset || 0;
+  const phi = Math.atan2(nx, nz);
+  return THREE.MathUtils.radToDeg(Math.PI - phi);
+}
+
+// ====== 加载主模型 ======
+const loader = new GLTFLoader();
+const loaderEl = document.getElementById('loader');
+const barFill = document.getElementById('bar-fill');
+
+function loadModel(url) {
+  loaderEl.classList.remove('hide');
+  barFill.style.width = '0%';
+  if (state.currentModel) {
+    if (state.currentModelYaw) scene.remove(state.currentModelYaw);
+    else scene.remove(state.currentModel);
+    state.currentModel.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    });
+  }
+  state.nodes = [];
+  state.selectedName = null;
+  state.currentUrl = url;
+  state.currentModel = null;
+  state.currentModelYaw = null;
+
+  loader.load(url, (gltf) => {
+    const model = gltf.scene;
+    state.currentModel = model;
+    const cfg = MODEL_CONFIGS[url] || {};
+
+    // 居中 + 缩放
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const longest = Math.max(size.x, size.y, size.z);
+    const s = 9 / longest * (cfg.userScale || 3.6) / 3.6;  // 应用 userScale
+    model.scale.setScalar(s);
+    model.position.sub(center.multiplyScalar(s));
+
+    // 包裹到 modelYaw Group（应用朝向）
+    const modelYaw = new THREE.Group();
+    modelYaw.add(model);
+    scene.add(modelYaw);
+    state.currentModelYaw = modelYaw;
+
+    // 应用 hideGearNodes 隐藏
+    if (cfg.hideGearNodes) {
+      const set = new Set(cfg.hideGearNodes);
+      model.traverse((o) => { if (o.name && set.has(o.name)) o.visible = false; });
+    }
+
+    // 算 _autoOrient 并应用到滑块
+    const autoYaw = computeAutoOrient(model, cfg);
+    state.yawOffset = autoYaw;
+    state.pitchOffset = 0;
+    state.rollOffset = 0;
+    updateOrientSliders();
+    applyOrientation();
+
+    // 收集节点
+    const meshNodes = [];
+    model.traverse((o) => {
+      if (o.isMesh && o.name) {
+        const mbox = new THREE.Box3().setFromObject(o);
+        const msize = mbox.getSize(new THREE.Vector3());
+        const mcenter = mbox.getCenter(new THREE.Vector3());
+        if (!isFinite(mcenter.y) || msize.length() < 0.001) return;
+        o._origOpacity = o.material.opacity ?? 1.0;
+        o._origTransparent = o.material.transparent;
+        meshNodes.push({
+          name: o.name, mesh: o, y: mcenter.y, x: mcenter.x, z: mcenter.z,
+          size: msize, visible: o.visible,
+          markedGear: cfg.hideGearNodes ? cfg.hideGearNodes.includes(o.name) : false,
+          markedProp: cfg.propNodes ? cfg.propNodes.includes(o.name) : false,
+        });
+      }
+    });
+    state.nodes = meshNodes;
+    renderNodeList();
+    loaderEl.classList.add('hide');
+  }, (xhr) => {
+    if (xhr.total) barFill.style.width = `${(xhr.loaded / xhr.total * 100).toFixed(0)}%`;
+  }, (err) => {
+    loaderEl.classList.add('hide');
+    alert('加载失败: ' + err.message);
+  });
+}
+
+// ====== 加载参考飞机 ======
+function loadReference(url) {
+  if (state.refModel) {
+    if (state.refModelYaw) scene.remove(state.refModelYaw);
+    else scene.remove(state.refModel);
+    state.refModel.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    });
+    state.refModel = null;
+    state.refModelYaw = null;
+  }
+  if (!url) return;
+
+  loader.load(url, (gltf) => {
+    const model = gltf.scene;
+    state.refModel = model;
+    const cfg = MODEL_CONFIGS[url] || {};
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const longest = Math.max(size.x, size.y, size.z);
+    const s = 9 / longest * (cfg.userScale || 3.6) / 3.6;
+    model.scale.setScalar(s);
+    model.position.sub(center.multiplyScalar(s));
+
+    // 参考飞机也应用 autoOrient
+    const refYaw = computeAutoOrient(model, cfg);
+    const modelYaw = new THREE.Group();
+    modelYaw.add(model);
+    modelYaw.rotation.set(
+      THREE.MathUtils.degToRad(cfg.pitchOffset || 0),
+      THREE.MathUtils.degToRad(cfg.autoOrient === false ? (cfg.yawOffset || 0) : refYaw),
+      THREE.MathUtils.degToRad(cfg.rollOffset || 0),
+      'YXZ'
+    );
+    scene.add(modelYaw);
+    state.refModelYaw = modelYaw;
+
+    // 应用透明度
+    applyRefOpacity();
+  });
+}
+
+function applyRefOpacity() {
+  if (!state.refModel) return;
+  const opacity = parseFloat(document.getElementById('ref-opacity').value);
+  state.refModel.traverse((o) => {
+    if (o.isMesh) {
+      o.material = o.material.clone();
+      o.material.transparent = true;
+      o.material.opacity = opacity;
+      o.material.depthWrite = false;
+    }
+  });
+}
+
+// ====== 应用朝向 ======
+function applyOrientation() {
+  if (!state.currentModelYaw) return;
+  state.currentModelYaw.rotation.set(
+    THREE.MathUtils.degToRad(state.pitchOffset),
+    THREE.MathUtils.degToRad(state.yawOffset),
+    THREE.MathUtils.degToRad(state.rollOffset),
+    'YXZ'
+  );
+}
+
+function updateOrientSliders() {
+  document.getElementById('yaw-slider').value = state.yawOffset;
+  document.getElementById('pitch-slider').value = state.pitchOffset;
+  document.getElementById('roll-slider').value = state.rollOffset;
+  document.getElementById('yaw-val').textContent = state.yawOffset.toFixed(1) + '°';
+  document.getElementById('pitch-val').textContent = state.pitchOffset.toFixed(1) + '°';
+  document.getElementById('roll-val').textContent = state.rollOffset.toFixed(1) + '°';
+}
+
+// ====== 节点列表 ======
+const nodeListEl = document.getElementById('node-list');
+function sortedNodes() {
+  const arr = [...state.nodes];
+  if (state.sortOrder === 'y') arr.sort((a, b) => a.y - b.y);
+  else arr.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  return arr;
+}
+function renderNodeList() {
+  nodeListEl.innerHTML = '';
+  sortedNodes().forEach((n) => {
+    const row = document.createElement('div');
+    row.className = 'node-row';
+    if (n.markedGear) row.classList.add('gear');
+    if (n.markedProp) row.classList.add('prop');
+    if (n.name === state.selectedName) row.classList.add('selected');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = n.visible;
+    cb.addEventListener('change', () => { n.visible = cb.checked; n.mesh.visible = cb.checked; });
+    const name = document.createElement('span'); name.className = 'name'; name.textContent = n.name;
+    const info = document.createElement('span'); info.className = 'info';
+    info.textContent = `Y=${n.y.toFixed(2)} ${n.size.x.toFixed(1)}×${n.size.y.toFixed(1)}×${n.size.z.toFixed(1)}`;
+    row.appendChild(cb); row.appendChild(name); row.appendChild(info);
+    if (n.markedGear) { const t = document.createElement('span'); t.className = 'tag gear'; t.textContent = '起落架'; row.appendChild(t); }
+    if (n.markedProp) { const t = document.createElement('span'); t.className = 'tag prop'; t.textContent = '螺旋桨'; row.appendChild(t); }
+    row.addEventListener('click', (e) => { if (e.target === cb) return; selectNode(n.name); });
+    nodeListEl.appendChild(row);
+  });
+}
+function selectNode(name) {
+  state.selectedName = name;
+  state.nodes.forEach((n) => {
+    if (n.name === name) {
+      n.mesh.material.transparent = false;
+      n.mesh.material.opacity = 1.0;
+      n.mesh.material.emissive = new THREE.Color(0x6fd0ff);
+      n.mesh.material.emissiveIntensity = 0.4;
+    } else {
+      n.mesh.material.transparent = true;
+      n.mesh.material.opacity = 0.12;
+      n.mesh.material.emissive = new THREE.Color(0x000000);
+      n.mesh.material.emissiveIntensity = 0;
+    }
+  });
+  renderNodeList();
+}
+
+// ====== 事件绑定 ======
+document.getElementById('model-select').addEventListener('change', (e) => loadModel(e.target.value));
+
+document.getElementById('btn-mark-gear').addEventListener('click', () => {
+  if (!state.selectedName) { alert('请先点击节点选中'); return; }
+  const n = state.nodes.find(x => x.name === state.selectedName);
+  if (n) { n.markedGear = !n.markedGear; if (n.markedGear) n.markedProp = false; renderNodeList(); }
+});
+document.getElementById('btn-mark-prop').addEventListener('click', () => {
+  if (!state.selectedName) { alert('请先点击节点选中'); return; }
+  const n = state.nodes.find(x => x.name === state.selectedName);
+  if (n) { n.markedProp = !n.markedProp; if (n.markedProp) n.markedGear = false; renderNodeList(); }
+});
+document.getElementById('btn-clear').addEventListener('click', () => {
+  state.nodes.forEach(n => { n.markedGear = false; n.markedProp = false; });
+  renderNodeList();
+});
+document.getElementById('btn-sort-y').addEventListener('click', () => { state.sortOrder = 'y'; renderNodeList(); });
+document.getElementById('btn-sort-name').addEventListener('click', () => { state.sortOrder = 'name'; renderNodeList(); });
+document.getElementById('btn-show-all').addEventListener('click', () => {
+  state.nodes.forEach(n => { n.visible = true; n.mesh.visible = true; });
+  renderNodeList();
+});
+document.getElementById('btn-hide-low-y').addEventListener('click', () => {
+  state.nodes.forEach(n => { if (n.y < 0.3) { n.visible = false; n.mesh.visible = false; } });
+  renderNodeList();
+});
+
+// 朝向滑块
+document.getElementById('yaw-slider').addEventListener('input', (e) => {
+  state.yawOffset = parseFloat(e.target.value);
+  document.getElementById('yaw-val').textContent = state.yawOffset.toFixed(1) + '°';
+  applyOrientation();
+});
+document.getElementById('pitch-slider').addEventListener('input', (e) => {
+  state.pitchOffset = parseFloat(e.target.value);
+  document.getElementById('pitch-val').textContent = state.pitchOffset.toFixed(1) + '°';
+  applyOrientation();
+});
+document.getElementById('roll-slider').addEventListener('input', (e) => {
+  state.rollOffset = parseFloat(e.target.value);
+  document.getElementById('roll-val').textContent = state.rollOffset.toFixed(1) + '°';
+  applyOrientation();
+});
+
+// 参考飞机
+document.getElementById('ref-select').addEventListener('change', (e) => loadReference(e.target.value));
+document.getElementById('ref-opacity').addEventListener('input', (e) => {
+  document.getElementById('ref-opacity-val').textContent = parseFloat(e.target.value).toFixed(2);
+  applyRefOpacity();
+});
+
+// 朝向按钮
+document.getElementById('btn-auto-orient').addEventListener('click', () => {
+  if (!state.currentModel) return;
+  const cfg = MODEL_CONFIGS[state.currentUrl] || {};
+  state.yawOffset = computeAutoOrient(state.currentModel, cfg);
+  state.pitchOffset = 0;
+  state.rollOffset = 0;
+  updateOrientSliders();
+  applyOrientation();
+});
+document.getElementById('btn-reset-orient').addEventListener('click', () => {
+  state.yawOffset = 0; state.pitchOffset = 0; state.rollOffset = 0;
+  updateOrientSliders();
+  applyOrientation();
+});
+document.getElementById('btn-show-arrow').addEventListener('click', (e) => {
+  state.showArrow = !state.showArrow;
+  arrow.visible = state.showArrow;
+  e.target.textContent = state.showArrow ? '隐藏箭头' : '显示箭头';
+});
+
+// 导出
+document.getElementById('btn-export').addEventListener('click', () => {
+  const gear = state.nodes.filter(n => n.markedGear).map(n => n.name);
+  const prop = state.nodes.filter(n => n.markedProp).map(n => n.name);
+  const url = state.currentUrl;
+  const out = `// ${url} 调整结果
+// 朝向: yawOffset=${state.yawOffset.toFixed(1)}, pitchOffset=${state.pitchOffset.toFixed(1)}, rollOffset=${state.rollOffset.toFixed(1)}
+// 起落架节点 (${gear.length}): ${gear.join(', ') || '无'}
+// 螺旋桨节点 (${prop.length}): ${prop.join(', ') || '无'}
+// 在 MODEL_CONFIGS['${url}'] 中追加/更新：
+yawOffset: ${state.yawOffset.toFixed(1)},
+pitchOffset: ${state.pitchOffset.toFixed(1)},
+rollOffset: ${state.rollOffset.toFixed(1)},
+${gear.length ? `hideGearNodes: ${JSON.stringify(gear)},\n` : ''}${prop.length ? `propNodes: ${JSON.stringify(prop)},` : ''}`;
+  document.getElementById('export-text').value = out;
+});
+document.getElementById('btn-copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(document.getElementById('export-text').value); alert('已复制'); }
+  catch (e) { alert('复制失败，手动全选复制'); }
+});
+document.getElementById('btn-select-all').addEventListener('click', () => {
+  const ta = document.getElementById('export-text'); ta.focus(); ta.select();
+});
+
+// ====== 调试钩子：暴露给 F12 console 与自动化脚本 ======
+// 在 console 中可直接访问 window.__debug.state / .camera / .controls / .computeAutoOrient
+window.__debug = { state, camera, controls, scene, renderer,
+  computeAutoOrient, applyOrientation, loadModel, loadReference, MODEL_CONFIGS };
+
+// ====== 启动 ======
+loadModel('/model/yak1.glb');
+</script>
+</body>
+</html>
