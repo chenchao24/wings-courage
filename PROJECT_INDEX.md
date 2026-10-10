@@ -1,155 +1,138 @@
 # 项目文件索引 (PROJECT_INDEX)
 
-> 二战空战游戏 darkWil —— 基于 Three.js 的浏览器 3D 空战游戏
-> 本文件为 AI 查询用索引，按分类组织，标注每个文件用途与关键入口。
+> 二战空战游戏《勇气之翼 Wings of Courage》（darkWil）—— 基于 Three.js 的浏览器 3D 空战游戏
+> 版本：**0.72.8.20** · 本文件为 AI 查询用索引，按分类组织，标注每个文件用途与关键入口。
 
 ---
 
 ## 0. 顶层目录树
 
 ```
-darkWil-0.3/
-├── index.html              # 游戏主入口
-├── package.json            # npm 配置（type:module）
-├── la5.config.json         # 项目配置
-├── _serve.cjs              # 本地静态服务器
-├── serve.bat / 启动服务器.bat  # 启动脚本
-├── README.md
+darkWil-0.7/
+├── index.html              # 游戏主入口（importmap → /vendor/three，加载 js/main.js）
+├── favicon.png
+├── 启动服务器.bat           # Windows 一键起本地服务器（npx http-server -p 5173）
+├── package.json            # type:commonjs；依赖 three + @gltf-transform/*（仅 tools/ 与 scripts/ 需要 npm install）
+├── README.md               # 项目说明（玩法/键位/运行/目录）
 ├── PROJECT_INDEX.md        # 本文件
+├── AGENTS.md               # 协作约定（自由模式与战役模式 100% 隔离铁原则）
 │
-├── js/                     # 核心源码
-├── model/                  # 3D 模型 (.glb)
-├── sound/                  # 音效 (.mp3)
-├── img/                    # UI 图片
-├── scripts/                # 构建/优化脚本
-├── tests/                  # 测试脚本与截图
-├── docs/                   # 项目文档
+├── js/                     # 游戏源码（66 个文件，见 §1）
+├── vendor/three/           # three r160 本地依赖：build/three.module.js + examples/jsm（controls/libs/loaders/objects/utils）
+├── model/                  # 3D 模型 .glb（见 §2）
+├── sound/                  # 音频（见 §3）
+├── img/                    # UI 图片（见 §3）
 │
-├── mapEditor.html          # 调试页面（地图编辑器）
-├── model_tuner.html        # 调试页面（模型调参）
-├── player_tuner.html       # 调试页面（玩家飞机调参）
-├── player_tuner_fw190.html # 调试页面（FW190 调参）
-├── player_tuner_me262.html # 调试页面（Me 262 调参：枪口/喷气口/节点显隐/座舱/物理）
-├── terrain_test.html       # 调试页面（地形测试，引用 js/）
-├── tune.html               # 调试页面（通用调参，引用 js/tune.js）
-├── tune_enemy.html         # 调试页面（敌机调参，引用 js/tune_enemy.js）
-├── tune_prop.html          # 调试页面（螺旋桨调参）
-├── tune_yak_models.html    # 调试页面（Yak 模型检查）
-└── roadMap.html            # 调试页面（路线图）
+├── docs/                   # 项目文档（见 §6）
+├── scripts/                # 资产管线脚本（见 §4）
+├── tools/                  # 开发调参工具页（见 §5）
+├── tests/                  # Playwright 回归测试（见 §7）
+│
+├── node_modules/           # npm install 产物（.gitignore；tools/ 调参页与 scripts/ 管线用）
+└── _archive/               # 本地归档（.gitignore，不随仓库上传）
+    ├── backup_20260820/    # 历史实验备份（云层/斯图卡合并/自由模式 262 等改动前的快照）
+    └── scripts/            # 退役管线脚本（convert_me262_specgloss.mjs、optimize_models.mjs 等）
 ```
-
-> **注意**：根目录的 `*.html` 调试页面引用了 `./js/` 相对路径，不可移动。
 
 ---
 
-## 1. 核心源码 `js/`
+## 1. 核心源码 `js/`（66 个文件）
 
-### 1.1 入口与核心系统
+### 1.1 入口与机制层（js/ 根，19 个文件）
 
 | 文件 | 用途 |
 |------|------|
 | `js/main.js` | **游戏入口**，由 index.html 加载，初始化 AppShell |
-| `js/aircraft.js` | `Aircraft` 类：飞机实体（玩家/敌机），物理、姿态、GLTF 加载 |
-| `js/enemy.js` | `Enemy` 类：敌机 AI（追击、射击、机动决策） |
-| `js/weapons.js` | 武器系统：射击、子弹、枪口闪光、命中检测 |
-| `js/controls.js` | `Controls` 类：键鼠/手柄输入映射 |
-| `js/audio.js` | 音效系统：引擎、射击、爆炸、Flak 爆炸声（程序化合成） |
-
-### 1.2 环境与场景
-
-| 文件 | 用途 |
-|------|------|
-| `js/environment.js` | `createEnvironment/disposeEnvironment`：环境构建总入口，组装地形/建筑/云/海/战场 |
-| `js/terrain.js` | `Terrain`：程序化地形高度图，`getHeight(x,z)` |
+| `js/aircraft.js` | `Aircraft` 基类：模型加载/校准/飞行物理/螺旋桨/损伤/坠毁/粒子（纯机制，无 AI 无关卡语义） |
+| `js/enemy.js` | `Enemy extends Aircraft`：敌机 AI（巡逻/追击/规避/开火）、MODEL_CONFIGS 机型校准表 |
+| `js/weapons.js` | 武器系统：曳光弹对象池、枪口特效、命中检测、随机伤害 |
+| `js/controls.js` | `Controls`：键盘输入 + 响应曲线（0.08s 起步斜坡），飞行键位定义 |
+| `js/audio.js` | `GameAudio`：WebAudio 合成 + 文件音效（引擎实录循环/枪声/命中 beHit/擦过 side） |
+| `js/radar.js` | `Radar`：右下角圆形雷达 HUD（canvas 2D） |
+| `js/environment.js` | `createEnvironment/disposeEnvironment`：环境总装入口（天空 shader/地形/建筑/云/海/战场） |
+| `js/terrain.js` | `Terrain`：fbm 噪声地形 + 顶点着色，`getHeight(x,z)` |
 | `js/ocean.js` | `Ocean`：海面渲染 |
-| `js/clouds.js` | `Clouds`：云层系统（含块状分布 patchiness / 高度相干 yCoherent / 距离淡出 distFade / 多层 extraBands 等可选配置，缺省=原行为） |
-| `js/buildings.js` | `Buildings`：建筑物放置 |
-| `js/groundTargets.js` | 地面目标（车辆、建筑等可命中目标） |
-| `js/targets.js` | 目标系统（任务目标管理） |
-| `js/radar.js` | `Radar`：雷达 HUD 显示 |
+| `js/clouds.js` | `Clouds`：云层（云系化可配：patchiness/yCoherent/distFade/extraBands，缺省=原行为） |
+| `js/buildings.js` | `Buildings`：程序化村庄/松树，obstacleBoxes 供坠毁检测 |
+| `js/groundTargets.js` | 地面目标（可命中物件） |
 
-### 1.3 库尔斯克关卡专用
+### 1.2 关卡专用模块（js/ 根）
 
 | 文件 | 用途 |
 |------|------|
-| `js/kurskBattlefield.js` | `KurskBattlefield`：库尔斯克战场构建（防空炮、T34 坦克、士兵、补给车、弹坑） |
-| `js/kurskRoads.js` | `KurskRoads`：库尔斯克道路网络 |
-| `js/AntiAircraftFlak.js` | `AntiAircraftFlak`：防空火力视觉系统（烟团、曳光弹、爆炸声、地面开炮闪光） |
+| `js/kurskBattlefield.js` | 库尔斯克战场（防空阵地、T-34 坦克、炮位士兵） |
+| `js/kurskRoads.js` | 库尔斯克道路网络 |
+| `js/AntiAircraftFlak.js` | 防空火力视觉/音效（烟团/曳光/地面闪光；含柏林 corridor 走廊模式打 B-17 编队） |
+| `js/berlinGround.js` | 柏林地面（纯平 + Sentinel-2 卫星贴图 80×64km + 视觉裙边，duck-type Terrain 接口） |
+| `js/JetExhaust.js` | 喷气尾流特效（喷口辉光/尾气粒子/热浪锥，`jetNozzles` 配置门控） |
+| `js/VaporTrail.js` | 翼尖拉烟/凝结尾迹 |
 
-### 1.3.1 柏林关卡专用（第4关）
-
-| 文件 | 用途 |
-|------|------|
-| `js/berlinGround.js` | `BerlinGround`：柏林地面（纯平 + Sentinel-2 卫星贴图 80×64km，duck-type Terrain 接口） |
-| `js/JetExhaust.js` | `JetExhaust`：喷气尾流特效（喷口辉光/尾气粒子空间发射/热浪锥 shader，`jetNozzles` 配置门控） |
-
-### 1.4 调参脚本（被根目录调试页面引用）
+### 1.3 应用壳与页面 `js/app/`（15 个文件）
 
 | 文件 | 用途 |
 |------|------|
-| `js/tune.js` | 通用调参逻辑，被 `tune.html` 引用 |
-| `js/tune_enemy.js` | 敌机调参逻辑，被 `tune_enemy.html` 引用 |
-
-### 1.5 应用壳与页面 `js/app/`
-
-| 文件 | 用途 |
-|------|------|
-| `js/app/AppShell.js` | 应用壳：页面路由与状态管理 |
-| `js/app/Router.js` | 路由器 |
-| `js/app/Theme.js` | 主题样式 |
+| `js/app/AppShell.js` | 应用壳：场景管理/页面路由/环境重建/关卡切换/柏林音乐接管 |
+| `js/app/Router.js` | 页面路由器 |
+| `js/app/Theme.js` | 全局样式（含暂停覆盖层、拦截进度 UI 的 CSS） |
 | `js/app/pages/_base.js` | 页面基类 |
-| `js/app/pages/CoverPage.js` | 封面页 |
+| `js/app/pages/CoverPage.js` | 封面页（`APP_VERSION` 版本号在此） |
 | `js/app/pages/MenuPage.js` | 主菜单页 |
-| `js/app/pages/LevelSelectPage.js` | 关卡选择页 |
-| `js/app/pages/BriefingPage.js` | 任务简报页 |
-| `js/app/pages/HangarPage.js` | 机库页 |
+| `js/app/pages/LevelSelectPage.js` | 战役关卡选择页 |
+| `js/app/pages/BriefingPage.js` | 任务简报页（进关卡入口） |
+| `js/app/pages/HangarPage.js` | 机库页（机型展示） |
 | `js/app/pages/SettingsPage.js` | 设置页 |
 | `js/app/pages/FreeMapSelectPage.js` | 自由模式 · 地图选择页 |
 | `js/app/pages/FreeHangarPage.js` | 自由模式 · 机库页（全屏 3D 展示台） |
-| `js/app/ui/Toggle.js` | UI 开关组件 |
 | `js/app/ui/LoadingOverlay.js` | 加载遮罩 |
+| `js/app/ui/Toggle.js` | UI 开关组件 |
 | `js/app/ui/icons.js` | 图标定义 |
 
-### 1.6 游戏运行时 `js/game/`
+### 1.4 游戏运行时 `js/game/`（19 个文件）
 
 | 文件 | 用途 |
 |------|------|
-| `js/game/GameRuntime.js` | **游戏主循环**：每帧 update 所有系统，`this.player?.root?.position` 传给 Flak |
-| `js/game/HudController.js` | HUD 控制器 |
-| `js/game/hud-template.js` | HUD 模板 |
+| `js/game/GameRuntime.js` | **战役主循环**：每帧 update 全部系统；键位（C/V/M/Esc）在 `_handleKey`；全部关卡配置门控在此注入 |
+| `js/game/WaveDirector.js` | 敌机波次导演（生成/撤退/波次推进） |
+| `js/game/HudController.js` | HUD 控制器（速度/高度/G 力/血条/拦截进度等） |
+| `js/game/hud-template.js` | HUD DOM 模板（含右下角操作说明键位表） |
 | `js/game/Settings.js` | 游戏设置 |
-| `js/game/DialogSystem.js` | 战斗对话系统 |
-| `js/game/CinematicSystem.js` | 过场动画系统 |
-| `js/game/WaveDirector.js` | 敌机波次导演 |
-| `js/game/LevelMusic.js` | 关卡音乐管理器（主题曲间隔循环 + 战斗高潮曲切换，淡入淡出） |
-| `js/game/FriendlyBomber.js` | 友军轰炸机 |
+| `js/game/DialogSystem.js` | 战斗对话系统（队列顺序播放） |
+| `js/game/CinematicSystem.js` | 过场动画系统（剧情编队；C 切视角 / Esc 跳过） |
 | `js/game/Tutorial.js` | 教程引导 |
-| `js/game/CombatAltRule.js` | 交战高度规则（仅 `combatAlt` 配置关卡，如第4关：警告/倒计时/失败或重置二选一） |
-| `js/game/JetThrottleGovernor.js` | 喷气油门管理器（仅 `jetThrottle` 配置关卡：峰值功率限制/冷却/回落） |
-| `js/game/WingmanJetTrail.js` | 僚机简化喷气尾流（仅第4关僚机：THREE.Points 软粒子喷流，无热浪锥/辉光，每架 1 draw call） |
+| `js/game/LevelMusic.js` | 关卡音乐管理器（主题曲/战斗曲切换，淡入淡出） |
+| `js/game/FriendlyBomber.js` | 友军轰炸机 NPC（第 1/2 关） |
+| `js/game/HeavyBomber.js` | **B-17 重轰炸机群**（直飞/受伤返航/炮塔多目标提前量/四式坠毁） |
+| `js/game/Wingman262Squadron.js` | **友军 Me 262 僚机小队**（指尖编队 → 1500m 解除 → 六模式猎杀表演/规避） |
+| `js/game/WingmanJetTrail.js` | 僚机喷流尾迹（THREE.Points 软圆斑，每架 1 draw call） |
+| `js/game/P51EscortSquadron.js` | **P-51 护航机群**（8 架 2 中队 4 小队：伴飞/拦截/猎杀/协同 + 防撞规避） |
+| `js/game/BerlinOpening.js` | 柏林 15s 推镜开场（鸭式复用 CinematicSystem 接线） |
+| `js/game/BerlinChatter.js` | 柏林专属喊话（开局 8 句 + 战斗 6 类，战斗开始门控） |
+| `js/game/BerlinMusic.js` | 柏林多段序列音乐（m1→elg→m2→交替→[进度≥90%]m3） |
+| `js/game/CombatAltRule.js` | 交战高度规则（`combatAlt` 门控：<2000m 倒计时判负或重置 4000m） |
+| `js/game/JetThrottleGovernor.js` | 喷气油门管理（`jetThrottle` 门控：80% 连续/90% 峰值/冷却回落） |
 
-### 1.7 关卡配置 `js/config/`
+### 1.5 战役关卡配置 `js/config/levels/`
 
 | 文件 | 用途 |
 |------|------|
+| `js/config/levels/index.js` | 关卡注册中心（9 关元数据，`UNLOCKED_IDS` 当前开放前 4 关） |
+| `js/config/levels/level_01_britain.js` | 第 1 关《风云不列颠》（Bf 109 E-4） |
+| `js/config/levels/level_02_barbarossa.js` | 第 2 关《巴巴罗萨之鹰》（Bf 109 E-4，`engineSoundFile` 引擎实录） |
+| `js/config/levels/level_03_kursk.js` | 第 3 关《鏖战库尔斯克》（Fw 190 A-4，`flak` 防空配置块） |
+| `js/config/levels/level_04_berlin.js` | 第 4 关《柏林保卫战》（Me 262：`combatAlt`/`jetThrottle`/`jetNozzles`/`bomberStream`/`escortP51`/`wingmen262`/`chatter`/`berlinMusic`/`intercept`/`downed`） |
 | `js/config/default-settings.js` | 默认设置 |
-| `js/config/levels/index.js` | 关卡索引 |
-| `js/config/levels/level_01_britain.js` | 第一关：不列颠空战 |
-| `js/config/levels/level_02_barbarossa.js` | 第二关：巴巴罗萨行动（含 `playerConfig.engineSoundFile` 引擎实录） |
-| `js/config/levels/level_03_kursk.js` | 第三关：库尔斯克（含 `flak` 防空配置块、坦克区、引擎实录） |
-| `js/config/levels/level_04_berlin.js` | 第四关：柏林保卫战（Me 262 喷气机，`combatAlt` 高度规则、`jetThrottle` 油门管理、`jetNozzles` 尾流、卫星贴图地面、多层云系） |
 
-### 1.8 自由模式 `js/freemode/` + `js/config/freemode/`（与战役模式 100% 隔离）
+### 1.6 自由模式 `js/freemode/` + `js/config/freemode/`（与战役 100% 隔离，见 AGENTS.md）
 
 | 文件 | 用途 |
 |------|------|
-| `js/freemode/FreeModeEnemy.js` | 自由模式敌机类（extends Aircraft，不 extends Enemy，独立 AI 配置） |
-| `js/freemode/FreeModeRuntime.js` | 自由模式运行时（不 extends GameRuntime） |
-| `js/freemode/FreeModeMaps.js` | 自由模式地图配置（玩家出生 [0,2000,0]） |
-| `js/config/freemode/aircraft.js` | 玩家机型配置（Bf109/Fw190，含 previewOffset 预览偏移） |
+| `js/freemode/FreeModeRuntime.js` | 自由模式运行时（不 extends GameRuntime；含喷气机门控分支） |
+| `js/freemode/FreeModeEnemy.js` | 自由模式敌机（extends Aircraft，不 extends Enemy，AI 配置独立） |
+| `js/freemode/FreeModeMaps.js` | 自由模式地图实际配置（环境/出生点） |
+| `js/config/freemode/aircraft.js` | 玩家机型配置（Bf109/Fw190/Me262，Me262 武器伤害 ×0.75） |
 | `js/config/freemode/enemy-aircraft.js` | 敌机机型配置（I-16/Spitfire/Yak-7/Yak-9） |
-| `js/config/freemode/maps.js` | 地图列表（6 个，巴巴罗萨开放） |
-| `js/config/freemode/difficulty.js` | 难度 + 时间限制 |
+| `js/config/freemode/maps.js` | 地图元数据（6 槽位，当前开放"巴巴罗萨"） |
+| `js/config/freemode/difficulty.js` | 难度乘数（敌机 HP/机动/火力、玩家 HP） |
 
 ---
 
@@ -157,21 +140,19 @@ darkWil-0.3/
 
 | 文件 | 机型 |
 |------|------|
-| `spitfire.glb` | 喷火 (英) |
-| `bf109_opt.glb` | Bf-109 (德) |
-| `fw_190_a-4.glb`, `fw_190_a-5.glb` | FW-190 A-4/A-5 (德) |
-| `yak1.glb`, `yak3.glb`, `yak7.glb`, `yak9.glb` | Yak 系列 (苏) |
-| `la5.glb` | La-5 (苏) |
-| `i16.glb`, `i153.glb` | I-16 / I-153 (苏) |
-| `il2.glb` | Il-2 对地攻击机 (苏) |
-| `p51.glb` | P-51 (英/美) |
-| `b17.glb` | B-17 轰炸机 (英/美) |
-| `me_262.glb` | Me 262 A-1a 喷气截击机 (德，第4关玩家机；已转标准 PBR 材质) |
-| `me_262_c-2b.glb` | Me 262 C-2b (德，备用) |
-| `me_262_specgloss_backup.glb` | me_262 原始 spec-gloss 备份（转换前） |
-| `he111.glb` | He-111 轰炸机 (德) |
-| `ju87.glb` | Ju-87 俯冲轰炸机 (德) |
-| `ju88.glb` | Ju-88 轰炸机 (德) |
+| `bf109_opt.glb` | Bf 109 E-4（第 1/2 关玩家机，meshopt+WebP 优化版） |
+| `fw_190_a-4.glb` / `fw_190_a-5.glb` | Fw 190 A-4/A-5（第 3 关玩家机） |
+| `me_262.glb` | Me 262 A-1a（第 4 关玩家机，已转标准 PBR） |
+| `me_262_specgloss_backup.glb` | me_262 转换前 spec-gloss 备份 |
+| `b17.glb` | B-17 轰炸机（网格合并优化后：116→26 mesh/架） |
+| `b17.original.glb` | B-17 管线输入备份（**勿删**，重跑 `optimize_b17.mjs` 需要） |
+| `p51.glb` / `p51.original.glb` | P-51（32→9 draw call/架 优化 + 管线备份） |
+| `spitfire.glb` | 喷火（英） |
+| `yak1.glb` / `yak3.glb` / `yak7.glb` / `yak9.glb` | Yak 系列（苏） |
+| `la5.glb` | La-5（苏） |
+| `i16.glb` / `i153.glb` | I-16 / I-153（苏） |
+| `il2.glb` | Il-2 对地攻击机（苏） |
+| `he111.glb` / `ju87.glb` / `ju88.glb` | He-111 / Ju-87 / Ju-88（德） |
 
 ---
 
@@ -179,122 +160,118 @@ darkWil-0.3/
 
 | 目录 | 内容 |
 |------|------|
-| `sound/` | `mainTitle.mp3`（主标题乐）, `adevnAs.mp3`, `shoot01/02.mp3`（射击音）, `sound/gun/`（机型枪声：mk108/fw190-151 等）, `sound/eg/`（引擎实录：bf109/fw190/me262-eg.mp3 + `-loop.wav` 无缝循环烘焙版） |
-| `img/` | `mb1/2.png`（主菜单背景）, `stg1-6.png`（过场图）, `img/gem/`（图标资源）, `img/berlin/`（Sentinel-2 卫星地面贴图 ground.jpg，第4关） |
+| `sound/` | `mainTitle.mp3`（主标题乐）、`adevnAs/fight/highWar/kersk.mp3`（各关音乐） |
+| `sound/bl/` | 柏林多段音乐 `elg/m2/m3.mp3`（m1 用根目录 `highWar.mp3`） |
+| `sound/eg/` | 引擎实录无缝循环 `bf109/fw190/me262-eg-loop.wav`（`scripts/make_engine_loops.py` 烘焙） |
+| `sound/gun/` | 机型枪声 `bf109-792/bf109-20/fw190-131-2/fw190-151-2/mk108.mp3` |
+| `sound/hit/` | 全局命中玩家 `beHit01-03.mp3` + 子弹擦过 `side1-3.mp3` |
+| `img/` | `mb1/2.png`（菜单背景）、`stg1-6.png`（关卡卡片/过场图）、`gem/`（图标） |
+| `img/berlin/` | Sentinel-2 卫星地面贴图 `ground.jpg`（第 4 关，`fetch_berlin_ground.py` 产物） |
 
 ---
 
-## 4. 构建脚本 `scripts/`
+## 4. 资产管线脚本 `scripts/`
 
 | 文件 | 用途 |
 |------|------|
-| `scripts/optimize_models.mjs` | glTF 模型优化（压缩、去冗余） |
+| `scripts/optimize_b17.mjs` | B-17 网格合并优化（读 `b17.original.glb` → 写 `b17.glb`；`helice03_FACES01-FACES` 节点不能删，桨叶组节点名是 pivot 查找键） |
+| `scripts/optimize_p51.mjs` | P-51 网格合并优化（读 `p51.original.glb` → 写 `p51.glb`） |
 | `scripts/inspect_glb.mjs` | GLB 结构检查（节点树/材质/纹理/包围盒） |
-| `scripts/convert_me262_specgloss.mjs` | me_262.glb 旧 spec-gloss 材质 → 标准 PBR 转换（一次性） |
-| `scripts/fetch_berlin_ground.py` | 柏林卫星地面图获取管线（Sentinel-2 AWS 公开桶，含覆盖率/云量过滤） |
-| `scripts/make_engine_loops.py` | 引擎实录无缝循环烘焙（裁头/周期对齐/交叉淡化 → -loop.wav） |
+| `scripts/fetch_berlin_ground.py` | 柏林卫星地面图获取（Sentinel-2 AWS 公开桶，Python venv 在 `scripts/.venv-ground/`） |
+| `scripts/make_engine_loops.py` | 引擎实录无缝循环烘焙（裁头/周期对齐/交叉淡化 → `*-loop.wav`） |
+
+退役脚本（`optimize_models.mjs`、`convert_me262_specgloss.mjs`、`_perf_models.mjs`、`draw_berlin_layout.py`）已移入 `_archive/scripts/`。
 
 ---
 
-## 5. 测试 `tests/`
+## 5. 调参工具页 `tools/`
 
-### 5.1 Python 测试 `tests/python/`
+12 个 HTML 调试页 + 配套脚本。**引用 `/node_modules/three`（非 /vendor），需先 `npm install` 再起本地服务器**，访问 `http://localhost:5173/tools/xxx.html`。
 
-| 文件 | 测试内容 |
-|------|----------|
-| `test_britain_level.py` | 不列颠关卡加载测试 |
-| `test_lock_altitude.py` | 高度锁定测试 |
-| `test_ocean_verify.py` | 海面渲染验证 |
-| `test_p2_full.py` | 第二关完整流程测试 |
-| `test_scan_spitfire_alt.py` | 喷火高度扫描 |
-| `test_spitfire_new.py` | 喷火新模型测试 |
-| `test_spit_debug.py` | 喷火调试 |
-| `test_spit_muzzle.py` | 喷火枪口闪光 |
-| `test_spit_prop.py` | 喷火螺旋桨 |
-| `test_spit_tree.py` | 喷火节点树 |
-| `test_tune_spitfire_yaw.py` | 喷火偏航调参 |
-| `test_berlin_level.py` | 第四关柏林全流程（加载/出生点/高度规则三态/重置） |
-| `test_campaign_regression.py` | 前三关隔离回归（改第4关后必跑） |
-
-### 5.2 测试截图与数据 `tests/screenshots/`
-
-- `*.png` — 各测试截图（封面、菜单、关卡、战斗、喷火各角度、海洋验证等）
-- `*.json` — 调试数据（`spit_muzzle_check.json`, `spit_nodes.json`, `spit_tree.json`）
-- `*.html` — 内联调试页（`test_prop_pivot.html` 引用 `/js/aircraft.js`，`_temp_orient_check.html`）
-- `*.py` — 截图辅助脚本（`diag_yak1_orient.py`, `test_orient_check.py`）
+| 文件 | 用途 |
+|------|------|
+| `model_tuner.html` | 敌机模型预处理（4 Tab，导出 → `js/enemy.js` MODEL_CONFIGS） |
+| `player_tuner.html` | Bf 109 玩家机调试台 |
+| `player_tuner_fw190.html` | Fw 190 玩家机调试台（导出 → `level_03_kursk.js` playerConfig） |
+| `player_tuner_me262.html` | Me 262 玩家机调试台（枪口/喷气口/座舱/物理，导出 → `level_04_berlin.js` playerConfig） |
+| `b17_tuner.html` | B-17 标定台 |
+| `tune.html` + `tune.js` | 玩家火炮位置调试 |
+| `tune_enemy.html` + `tune_enemy.js` | 敌机朝向/枪口调试 |
+| `tune_prop.html` | 螺旋桨调参 |
+| `tune_yak_models.html` | Yak 模型检查 |
+| `terrain_test.html` | 地形测试 |
+| `mapEditor.html` | 地图编辑器 |
+| `roadMap.html` | 路线图 |
+| `la5.config.json` | La-5 调参配置 |
 
 ---
 
 ## 6. 文档 `docs/`
 
-### 6.1 顶层文档
-
 | 文件 | 内容 |
 |------|------|
-| `docs/CHANGELOG.md` | 变更日志 |
-| `docs/DESIGN.md` | 设计文档（架构、视觉规范） |
-| `docs/HANDOVER.md` | 交接文档 |
-| `docs/DEBUG_BUG_LOG.md` | Bug 调试记录 |
+| `docs/CHANGELOG.md` | 功能迭代时间线（#1-#83） |
+| `docs/HANDOVER.md` | 交接文档（现状/约束/文件清单/下一步） |
 | `docs/OPTIMIZATION.md` | 性能优化记录 |
-| `docs/IL2设定文档.md` | Il-2 设定（后炮塔枪口闪光等） |
-| `docs/Flak防空火力参数说明.md` | **Flak 参数速查**（区域、炮位、烟团、曳光弹、音效、闪光、3D 模型） |
-| `docs/Flak防空火力设计文档.md` | Flak 设计文档 |
-| `docs/glTF缓存克隆与战斗对话系统文档.md` | glTF 缓存与对话系统 |
-| `docs/海面雪花修正及海洋场景优化文档.md` | 海面优化 |
-| `docs/dialog_level1_split.md` | 第一关对话拆分 |
-
-### 6.2 库尔斯克 `docs/库尔斯克/`
-
-| 文件 | 内容 |
-|------|------|
-| `交接文档_库尔斯克关卡.md` | 库尔斯克关卡交接 |
-| `库尔斯克补充点位图（防空和坦克）.md` | **防空区域与坦克区地图点位**（Flak 配置依据） |
-| `库尔斯克地图点位.md` | 原始地图点位 |
-| `库尔斯克对话剧本.md` | 对话剧本 |
-| `库尔斯克构思.md` | 关卡构思 |
-| `库尔斯克剧情脚本.md` | 剧情脚本 |
-
-### 6.3 调试笔记 `docs/调试笔记/`
-
-| 文件 | 内容 |
-|------|------|
-| `111.md` | 零散笔记 |
-| `88.md` | 零散笔记 |
-| `不列颠剧情脚本.md` | 不列颠剧情 |
-| `FW190螺旋桨透明切割方案.md` | FW190 螺旋桨方案 |
-
-### 6.4 参考图片 `docs/参考图片/`
-
-4 张 `.jpeg` 参考图（地图/场景参考）。
+| `docs/上线前优化清单.md` | 上线前优化清单 |
+| `docs/Flak防空火力参数说明.md` | Flak 参数速查 |
+| `docs/柏林喊话审核.md` / `docs/界面文本审核.md` | 第 4 关喊话与界面文本审核 |
+| `docs/berlin_initial_layout.png` | 柏林初始布局图（俯视/侧视/玩家编队 inset） |
+| `docs/柏林/` | 柏林关卡交接文档与喊话文本 |
+| `docs/库尔斯克/` | 库尔斯克交接/地图点位/对话剧本/剧情脚本 |
+| `docs/archive/` | 历史稿（DESIGN.md、DEBUG_BUG_LOG.md、Flak 设计文档、IL2 设定、调试笔记、参考图片等） |
 
 ---
 
-## 7. 关键调用链（AI 快速定位）
+## 7. 测试 `tests/`
+
+Playwright 截图/断言测试，**需先起本地服务器（打 `http://127.0.0.1:5173`）**，Python 运行。
+
+| 文件 | 测试内容 |
+|------|----------|
+| `tests/python/test_campaign_regression.py` | **前三关回归（改共享代码后必跑）** |
+| `tests/python/test_berlin_level.py` | 第 4 关全流程（加载/出生点/高度规则三态/重置） |
+| `tests/python/test_britain_level.py` | 不列颠关卡加载 |
+| `tests/python/test_p2_full.py` | 第 2 关完整流程 |
+| `tests/python/test_lock_altitude.py` / `test_ocean_verify.py` | 高度锁定 / 海面渲染验证 |
+| `tests/python/test_spit_*.py` 等 | 喷火模型专项（高度/枪口/螺旋桨/节点树/偏航） |
+| `tests/python/_diag/` | 辅助诊断脚本（B-17 特效/柏林裙边/出生点分布等截图脚本） |
+
+测试截图产物（`tests/screenshots/`、`tests/test_shots/`）已 gitignore，可再生成。
+
+---
+
+## 8. 关键调用链（AI 快速定位）
 
 ```
-index.html
+index.html（importmap → /vendor/three）
   └─ js/main.js
        └─ js/app/AppShell.js → Router → pages/*
-            └─ BriefingPage → GameRuntime (js/game/GameRuntime.js)
-                 ├─ environment.js: createEnvironment(levelConfig)
-                 │    ├─ Terrain, Ocean, Clouds, Buildings
-                 │    ├─ KurskBattlefield (防空炮3D模型 + T34坦克 + 士兵)
-                 │    └─ AntiAircraftFlak (烟团/曳光弹/爆炸声/地面闪光)
-                 ├─ Aircraft (玩家) → Controls → Weapons
-                 ├─ Enemy → WaveDirector
-                 ├─ DialogSystem, CinematicSystem
-                 └─ HudController, Radar
+            ├─ BriefingPage → GameRuntime（战役，js/game/GameRuntime.js）
+            │    ├─ environment.js: createEnvironment(levelConfig)
+            │    │    ├─ Terrain / Ocean / Clouds / Buildings
+            │    │    ├─ KurskBattlefield + AntiAircraftFlak（库尔斯克/柏林）
+            │    │    └─ BerlinGround（柏林，theme:'berlin' 唯一入口）
+            │    ├─ Aircraft（玩家）→ Controls → Weapons
+            │    ├─ Enemy → WaveDirector
+            │    ├─ HeavyBomber（B-17 机群）/ P51EscortSquadron / Wingman262Squadron（柏林）
+            │    ├─ DialogSystem / CinematicSystem / Tutorial
+            │    ├─ CombatAltRule / JetThrottleGovernor（配置门控）
+            │    └─ HudController / Radar / LevelMusic（BerlinMusic 接管）
+            └─ FreeHangarPage → FreeModeRuntime（自由模式，js/freemode/，隔离区）
 ```
 
-**Flak 每帧更新**：`GameRuntime.js:983` → `AntiAircraftFlak.update(dt, playerPos)` → 分区发射 → `_emitBurstFromZone`/`_emitBurstFromGun` → `_spawnGroundFlash` + `audio.flakExplosion(distance)`
+- **键位**：飞行输入 `js/controls.js`；C/V/M/Esc 在 `GameRuntime._handleKey`（自由模式同款在 `FreeModeRuntime._handleKey`）
+- **Flak 每帧更新**：`GameRuntime` 主循环 → `AntiAircraftFlak.update(dt, playerPos)` → 分区发射 → 地面闪光 + `audio.flakExplosion(distance)`
+- **柏林开场**：`BerlinOpening`（15s 推镜）→ 僚机轨载钉死槽位 → 交接 `Wingman262Squadron` 编队
 
 ---
 
-## 8. 技术栈
+## 9. 技术栈
 
-- **渲染**：Three.js（ES Module，importmap）
-- **语言**：JavaScript（ES Module，`package.json` type:module）
-- **模型**：glTF (.glb)，DRACO/meshopt 压缩
-- **音效**：Web Audio API（程序化合成 + MP3 文件）
-- **测试**：Python（Playwright/截图脚本）
-- **服务器**：`_serve.cjs`（Node.js 静态服务器）
+- **渲染**：Three.js 0.160（ES Module + importmap；主游戏用 `/vendor/three`，调参页用 `/node_modules/three`）
+- **语言**：原生 JavaScript（ESM），无框架、无构建步骤
+- **模型**：glTF .glb，meshopt/WebP 压缩（gltf-transform 离线管线）
+- **音效**：Web Audio API（程序化合成 + MP3/WAV 文件）
+- **测试**：Python + Playwright
+- **部署**：纯静态站，整目录上传即可；主游戏运行不依赖 `node_modules`
