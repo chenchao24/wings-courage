@@ -21,7 +21,7 @@ const _SUPPORT_DIRS = ['rear', 'top', 'left', 'right'];
 
 /**
  * 敌机模型校准注册表：按模型 URL 注入朝向/缩放/枪口参数（在 load(url) 时应用）。
- * - 已校准模型（如 Yak-9）：手动偏航值 + 校准枪口（由 tune_enemy.html 调出）。
+ * - 已校准模型（如 Yak-9）：手动偏航值 + 校准枪口（由 tools/tune_enemy.html 调出）。
  * - 新增模型：默认 autoOrient=true（按螺旋桨节点质心自动对齐 -Z），后续可调校后覆盖。
  * 未列出的模型沿用 Enemy 构造函数默认值（autoOrient=true + 通用枪口）。
  *
@@ -35,7 +35,7 @@ const _SUPPORT_DIRS = ['rear', 'top', 'left', 'right'];
  */
 export const MODEL_CONFIGS = {
   '/model/yak9.glb': {
-    autoOrient: false,  // 手动偏航（模型导出朝向偏 139°，由 tune_enemy.html 调出）
+    autoOrient: false,  // 手动偏航（模型导出朝向偏 139°，由 tools/tune_enemy.html 调出）
     yawOffset: -139, pitchOffset: 0, rollOffset: 0,
     userScale: 3.52,     // 9.7/9.92 * 3.6
     muzzleOffsets: [
@@ -63,7 +63,7 @@ export const MODEL_CONFIGS = {
     autoOrient: true,
     userScale: 3.63,     // 10.0/9.92 * 3.6
     hideGear: true,      // 触发 _hideLandingGear
-    // 用户用 tune_yak_models.html 视觉识别的起落架节点（22 个）
+    // 用户用 tools/tune_yak_models.html 视觉识别的起落架节点（22 个）
     hideGearNodes: [
       'Line27-FACES_1', 'Line26-FACES_1', 'Line25-FACES_1', 'Torus08-FACES_1',
       'Cylinder28-FACES_1', 'Line08-FACES_1', 'Line09-FACES_1', 'Line03-FACES_1',
@@ -154,7 +154,7 @@ export const MODEL_CONFIGS = {
     propAxisTilt: { x: 0, y: 0 },     // 旋转轴倾斜修正（度），0=不修正
     propPivotOffset: { x: 0, y: 0, z: 0 }, // 桨毂圆心偏移（模型局部空间）
     // A翼布局：8 × .303 勃朗宁（4左+4右机翼前缘），历史真实火力
-    // 枪口位置由 model_tuner.html 校准台精调（沿机翼前缘分布，翼尖外移）
+    // 枪口位置由 tools/model_tuner.html 校准台精调（沿机翼前缘分布，翼尖外移）
     muzzleOffsets: [
       new THREE.Vector3( 12.05, -0.30, -6.80),  // 右翼外
       new THREE.Vector3(  9.20, -0.60, -7.00),  // 右翼中外
@@ -214,7 +214,7 @@ export const MODEL_CONFIGS = {
   },
   // Heinkel He 111 H-2（德国主力轰炸机，不列颠战役参战；第3关"伦敦上空"轰炸机）
   // 双发中型轰炸机，真实翼展 22.6m（机身约为 Bf 109 的 2.3 倍），userScale=8.20
-  // 朝向为手工调整（autoOrient:false + yawOffset=-51.0，由 tune_enemy.html 调出）
+  // 朝向为手工调整（autoOrient:false + yawOffset=-51.0，由 tools/tune_enemy.html 调出）
   // centerOffset=[2.55,0,0.50]：Box3 几何中心与视觉中心偏差，由调校台手调
   // 螺旋桨：模型把左右桨几何合并到单节点 Ellipse09-FACES_1，无法各自独立旋转
   //         → propBlurOnly:true 标记为纯模糊盘，半透明显示但不旋转
@@ -246,7 +246,7 @@ export const MODEL_CONFIGS = {
   },
   // Junkers Ju 88（德国多功能作战飞机，可用作俯冲轰炸机/重型战斗机）
   // 双发，真实翼展 18.26m、长度 14.36m（机身约为 Bf 109 的 1.8 倍），userScale=6.64
-  // 朝向为手工调整（autoOrient:false + yawOffset=308.5，由 tune_enemy.html 调出）
+  // 朝向为手工调整（autoOrient:false + yawOffset=308.5，由 tools/tune_enemy.html 调出）
   // centerOffset=[1.40,0,0]：Box3 几何中心与视觉中心偏差
   // 起落架：10 个节点（支柱+轮组，节点名不含 _1 后缀，已修正）
   // 自卫炮塔：1 前枪(座舱固定) + 3 自卫炮塔(背/腹/侧后)，含独立发射方向 muzzleDirs
@@ -290,7 +290,7 @@ export const MODEL_CONFIGS = {
   // 4 螺旋桨节点 helice03_FACES01~04（各成一组 multiProp）；模型自带半透明模糊盘（Cylinder15~22 系列），
   //   故 propBlurDisc 不再程序化生成。
   // 起落架：rueda 轮组（Object35/Object03 主轮、rueda01_FACES02、Object02 尾轮）。
-  // 枪口/炮塔/发动机点位待 b17_tuner.html 标定后写入。
+  // 枪口/炮塔/发动机点位待 tools/b17_tuner.html 标定后写入。
   '/model/b17.glb': {
     autoOrient: false,
     yawOffset: 90.0, pitchOffset: 0.0, rollOffset: 0.0,
@@ -662,7 +662,7 @@ export class Enemy extends Aircraft {
     this.userScale   = 3.6;   // Bf 109 基准；已知模型在 MODEL_CONFIGS 中按真实尺寸比例覆盖
 
     // 默认枪口（body frame，机头=-Z）：沿用 Yak-9 校准值作为通用敌机枪口。
-    // 具体模型可在 MODEL_CONFIGS 中覆盖（需用 tune_enemy.html 调校）。
+    // 具体模型可在 MODEL_CONFIGS 中覆盖（需用 tools/tune_enemy.html 调校）。
     this.muzzleOffsets = [
       new THREE.Vector3( 6.50, -1.35, -4.15),  // 右机翼
       new THREE.Vector3(-6.50, -1.35, -4.15),  // 左机翼

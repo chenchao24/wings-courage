@@ -26,6 +26,8 @@ js/config/freemode/   # 自由模式配置数据（隔离区）
 js/app/pages/
   ├── FreeMapSelectPage.js
   └── FreeHangarPage.js
+tools/                # 开发调参工具页（12 个 html + tune.js/tune_enemy.js + la5.config.json；importmap 指向 /node_modules，仅本地用，不进部署）
+_archive/             # 本地归档（改前备份、一次性脚本；已被 .gitignore，不上传）
 ```
 
 ### 验证清单（改自由模式后必跑）
@@ -37,12 +39,12 @@ js/app/pages/
 - 自由模式框架搭建中；Me 262 已加入自由模式可选机型（#82，武器伤害 ×0.75）
 - 第 4 关《柏林保卫战》P1 已落地（2026-08-16 ~ 08-17，详见 docs/CHANGELOG.md #58-#62）：
   - **地图**：`js/berlinGround.js`（纯平 + Sentinel-2 卫星贴图 80×64km，`theme:'berlin'` 唯一入口）；管线 `scripts/fetch_berlin_ground.py`；#66 起加**视觉裙边**藏图幅边界（环形零重叠平面 + 主图降采样镜像延伸 + 主图边缘 2km 羽化，`skirtScale/skirtTexSize/featherMeters` 可配）
-  - **Me 262 玩家机**：spec-gloss→PBR 转换（scripts/convert_me262_specgloss.mjs）、`player_tuner_me262.html` 调试台、4×MK108（tracerColor 曳光定制）、史实物理包线
+  - **Me 262 玩家机**：spec-gloss→PBR 转换（_archive/scripts/convert_me262_specgloss.mjs）、`tools/player_tuner_me262.html` 调试台、4×MK108（tracerColor 曳光定制）、史实物理包线
   - **喷气三件套**（playerConfig 门控）：文件引擎音（`engineSoundFile`，无缝循环烘焙 scripts/make_engine_loops.py）、尾流特效 `js/JetExhaust.js`（`jetNozzles`）、油门管理 `js/game/JetThrottleGovernor.js`（`jetThrottle`，80% 连续/90% 峰值/冷却）
   - **规则**：`js/game/CombatAltRule.js` 交战高度规则（`combatAlt`，<2000m 倒计时判负或重置 4000m）
   - **云层**：clouds.js 云系化（patchiness/yCoherent/spreadMul/distFade/extraBands/texHoles，缺省=原行为）
   - 共享文件仅加"缺省关闭/缺省原值"门控分支；回归：`tests/python/test_berlin_level.py` + `tests/python/test_campaign_regression.py`
-- **B-17 轰炸机群已落地**（`bomberStream` 配置 + `js/game/HeavyBomber.js`，直飞/受伤返航/炮塔提前量；`b17_tuner.html` 标定），并做了**网格合并优化**（CHANGELOG #63）：
+- **B-17 轰炸机群已落地**（`bomberStream` 配置 + `js/game/HeavyBomber.js`，直飞/受伤返航/炮塔提前量；`tools/b17_tuner.html` 标定），并做了**网格合并优化**（CHANGELOG #63）：
   - 管线 `scripts/optimize_b17.mjs`：`model/b17.original.glb`（原始备份）→ `model/b17.glb`（116→26 mesh/架，近距 draw call 2398→768）；重跑模型管线前不要删备份
   - 关键坑：`helice03_FACES01-FACES` 不能删（运行时隐藏，但 `_setupPropPivot` 靠它算 pivot 包围盒）；4 个桨叶组节点名是 pivot 旋转的查找键，合并必须绕过
   - P-51 护航 AI 已上线（#75-#77，8 架 2 中队 4 小队）；B-17 凝结尾迹待做（#63 遗留）；同屏架次 30+ 再评估 InstancedMesh

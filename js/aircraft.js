@@ -1003,7 +1003,7 @@ export class Aircraft {
     // 把几何中心移到原点
     this.model.position.copy(center).multiplyScalar(-this.baseScale);
     // 用户中心偏移（body frame 世界单位，缩放后）：微调几何中心与视觉中心的对齐
-    // 用于垂尾偏高/机头不对称等场景，由 tune_enemy.html 调校后写入 MODEL_CONFIGS.centerOffset
+    // 用于垂尾偏高/机头不对称等场景，由 tools/tune_enemy.html 调校后写入 MODEL_CONFIGS.centerOffset
     if (this.centerOffset) {
       this.model.position.x += this.centerOffset[0] || 0;
       this.model.position.y += this.centerOffset[1] || 0;
