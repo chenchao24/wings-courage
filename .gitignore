@@ -29,3 +29,6 @@ _archive/
 Thumbs.db
 .DS_Store
 *.log
+
+# 发布构建目录（scripts/deploy_pages.sh 生成）
+_release/
