@@ -2,6 +2,7 @@
 # 仅排除本地开发/管线内容；切勿排除：index.html / favicon.png / js / vendor / model(除下述三个备份) / sound / img
 
 /node_modules/
+/.git/
 /scripts/
 /tests/
 /tools/
@@ -11,6 +12,7 @@
 /package-lock.json
 /*.md
 /.gitignore
+/.assetsignore
 /启动服务器.bat
 
 # 模型管线原始备份（保留在 git，不部署）
