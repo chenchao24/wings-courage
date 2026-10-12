@@ -17,12 +17,12 @@ export default {
   name: '柏林保卫战',
   subtitle: 'Battle of Berlin',
   date: '1945.03.18',
-  cardImage: '/img/stg4.png',
+  cardImage: '/img/stg4.webp',
   difficulty: 4,
   briefing:
     '1945 年 3 月，帝国领空。美军轰炸机群每日白昼临空，战争已来到柏林上空。' +
     '你驾驶 Me 262 喷气截击机紧急升空，在轰炸机群抵达市区之前尽可能拦截削弱它们。' +
-    '保持作战高度，上尉',
+    '保持作战高度，上尉。',
   locked: false,
   playerModel: '/model/me_262.glb',
 

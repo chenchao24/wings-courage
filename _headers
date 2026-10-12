@@ -1,0 +1,19 @@
+# Cloudflare Pages 缓存策略（根路径部署）
+# 资产文件名不带 hash：大资产缓存一周，便于更新后一周内全网自然生效
+
+/model/*
+  Cache-Control: public, max-age=604800
+/sound/*
+  Cache-Control: public, max-age=604800
+/img/*
+  Cache-Control: public, max-age=604800
+/vendor/*
+  Cache-Control: public, max-age=604800
+
+/js/*
+  Cache-Control: public, max-age=3600
+
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate

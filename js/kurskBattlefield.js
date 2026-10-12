@@ -1,5 +1,6 @@
-﻿import * as THREE from 'three';
+import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 // ════════════════════════════════════════════════════════════
 // 模块级常量：GLTF 模型库
@@ -601,6 +602,8 @@ export class KurskBattlefield {
   async _loadAllGltfModels() {
     try {
       const loader = new GLTFLoader();
+      // meshopt 解码器：优化版模型使用 EXT_meshopt_compression，必须注册否则报错（同 aircraft.js）
+      loader.setMeshoptDecoder(MeshoptDecoder);
       // 实例级场景缓存（同模型只加载一次，后续 clone 复用）
       const sceneCache = new Map();
       const loadScene = async (path) => {

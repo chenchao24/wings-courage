@@ -24,8 +24,8 @@ export const LEVELS = [
   barbarossa, // index 2 · 已开放
   kursk,      // index 3 · 已开放（Fw 190 A-4 玩家飞机）
   berlin,     // index 4 · 本次开放（Me 262 玩家飞机，P1 地图骨架阶段）
-  { id: 'midway',     index: 5, name: '血战中途岛',     subtitle: 'Battle of Midway',         locked: true, cardImage: '/img/stg5.png', difficulty: 4 },
-  { id: 'mariana',    index: 6, name: '马里亚纳猎杀火鸡日', subtitle: 'Mariana Turkey Shoot', locked: true, cardImage: '/img/stg6.png', difficulty: 2 },
+  { id: 'midway',     index: 5, name: '血战中途岛',     subtitle: 'Battle of Midway',         locked: true, cardImage: '/img/stg5.webp', difficulty: 4 },
+  { id: 'mariana',    index: 6, name: '马里亚纳猎杀火鸡日', subtitle: 'Mariana Turkey Shoot', locked: true, cardImage: '/img/stg6.webp', difficulty: 2 },
   placeholder('locked7', 7, '尚未开放'),
   placeholder('locked8', 8, '尚未开放'),
   placeholder('locked9', 9, '尚未开放'),

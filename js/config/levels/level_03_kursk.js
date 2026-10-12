@@ -17,7 +17,7 @@ export default {
   name: '鏖战库尔斯克',
   subtitle: 'Battle of Kursk',
   date: '1943.07.05',
-  cardImage: '/img/stg3.png',
+  cardImage: '/img/stg3.webp',
   difficulty: 3,
   briefing:
     '1943 年 7 月 5 日，堡垒行动打响。你驾驶 Fw 190 A-4 从前线机场起飞，' +

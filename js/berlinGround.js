@@ -47,6 +47,10 @@ export class BerlinGround {
     this._texture = new THREE.TextureLoader().load(this.textureUrl, (tex) => {
       this._applyFeatheredMain(tex.image);   // 主图边缘羽化后替换主贴图
       this._buildSkirtTexture(tex.image);    // 裙边用原图降采样
+    }, undefined, () => {
+      // 贴图加载失败（离线/图幅缺失）：程序化纯色微噪点兜底，保证地面不是黑窟窿
+      console.warn('[BerlinGround] 卫星贴图加载失败，启用程序化兜底纹理:', this.textureUrl);
+      this._applyFallbackTexture();
     });
     this._texture.colorSpace = THREE.SRGBColorSpace;
     this._texture.anisotropy = this.anisotropy;
@@ -192,6 +196,37 @@ export class BerlinGround {
     this._skirt.material.color.set(0xffffff);
     this._skirt.material.needsUpdate = true;
     this._skirtTexture = tex;
+  }
+
+  /**
+   * 卫星贴图加载失败兜底：暗灰城市色 + 微噪点 CanvasTexture（平铺），替换主贴图。
+   * 裙边保持 _createSkirt 的兜底色不变；成功路径（羽化/裙边贴图）任何行为不动。
+   */
+  _applyFallbackTexture() {
+    const S = 64;
+    const c = document.createElement('canvas');
+    c.width = c.height = S;
+    const ctx = c.getContext('2d');
+    const img = ctx.createImageData(S, S);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const n = (Math.random() - 0.5) * 14;     // 微噪点
+      img.data[i] = 74 + n;                     // 暗灰城市色（近似卫星图建成区均值）
+      img.data[i + 1] = 76 + n;
+      img.data[i + 2] = 70 + n;
+      img.data[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(200, 160);                   // ~400m/块，破平铺感
+    tex.anisotropy = this.anisotropy;
+    if (this.mesh) {
+      this.mesh.material.map = tex;
+      this.mesh.material.needsUpdate = true;
+    }
+    if (this._texture) this._texture.dispose(); // 释放加载失败的原纹理对象
+    this._texture = tex;
   }
 
   // 纯平地面：恒定 0。高空关卡，玩家不会接近地面。

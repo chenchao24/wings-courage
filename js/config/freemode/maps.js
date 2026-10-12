@@ -11,7 +11,7 @@ export const FREE_MAPS = [
     name: '巴巴罗萨',
     subtitle: '东线平原 · 1941',
     locked: false,
-    cardImage: '/img/stg2.png',
+    cardImage: '/img/stg2.webp',
     desc: '东线夏季晴天，广阔平原与稀疏村庄',
   },
   { id: 'locked2', name: '不列颠海峡', subtitle: 'Coming Soon', locked: true, desc: '英吉利海峡多云天气' },

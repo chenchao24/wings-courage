@@ -1,5 +1,7 @@
-"""第二关《风云不列颠》端到端测试 v2
+"""第一关《风云不列颠》端到端测试 v2
 通过 router.go() 直接导航，避免 hash 路由假设。
+护航关设计：出生 [120,2070,21000] 剧情锁操纵 ~4 分钟飞到 triggerZ=10000 接敌；
+测试用 ESC 跳过剧情（skipToZ=11000 + skipStartDelay(0)）立即触发刷敌。
 """
 import asyncio
 import sys
@@ -9,6 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from playwright.async_api import async_playwright
+
+# Windows GBK 控制台兼容（简报文本含 ▸ 等字符）
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 URL = "http://127.0.0.1:5173/index.html"
 SCREENSHOTS_DIR = ROOT / "test_shots"
@@ -172,9 +178,9 @@ async def main():
 
         pp = info.get("playerPos")
         if pp:
-            # 允许 ±200 漂移（玩家已飞行几秒）
-            if abs(pp[0]) > 200 or abs(pp[2] - (-3600)) > 200:
-                print(f"❌ 玩家位置错误: {pp} (期望 z≈-3600，允许 ±200)"); ok = False
+            # 护航位出生点 [120, 2070, 21000]（剧情锁操纵，随编队缓慢前行）
+            if abs(pp[0] - 120) > 200 or abs(pp[1] - 2070) > 150 or abs(pp[2] - 21000) > 600:
+                print(f"❌ 玩家位置错误: {pp} (期望 ≈[120, 2070, 21000])"); ok = False
             else: print(f"✓ 玩家位置合理: ({pp[0]}, {pp[1]}, {pp[2]})")
 
         pf = info.get("playerFwd")
@@ -183,8 +189,22 @@ async def main():
                 print(f"❌ 玩家朝向不对: {pf} (期望 ~[0, 0, -1])"); ok = False
             else: print(f"✓ 玩家朝向 -Z: {pf}")
 
-        # 等待敌机生成（首波 0s 后立即刷，但 model 异步加载需时间）
-        print("\n等待敌机生成...")
+        # 剧情过场 ~4 分钟（飞到 triggerZ=10000 接敌）；ESC 跳过剧情立即触发刷敌
+        # 注意：必须等 CinematicSystem 激活后再按 ESC，否则 ESC 会落入暂停逻辑
+        print("\n等待剧情系统激活...")
+        cin_ready = await wait_for(page, """
+            () => { const r = window.__shell && window.__shell.runtime;
+                    return r && r.cinematic && r.cinematic.active ? 'ready' : null; }
+        """, timeout=30_000, interval=500)
+        if not cin_ready:
+            print("❌ 剧情系统 30s 内未激活")
+            ok = False
+        print("按 ESC 跳过剧情过场...")
+        await page.keyboard.press("Escape")
+        await page.wait_for_timeout(1000)
+
+        # 等待敌机生成（skipStartDelay(0) 后立即刷，model 异步加载需时间）
+        print("等待敌机生成...")
         enemy_ready = await wait_for(page, """
             () => {
                 const r = window.__shell && window.__shell.runtime;
@@ -192,9 +212,10 @@ async def main():
                 const es = r.enemies || [];
                 return es.length > 0 && es[0].model && es[0].model.visible ? 'ready' : null;
             }
-        """, timeout=20_000, interval=500)
+        """, timeout=40_000, interval=500)
         if not enemy_ready:
-            print("⚠ 敌机未在 20s 内加载完成")
+            print("❌ 敌机未在跳过剧情后 40s 内加载完成")
+            ok = False
         else:
             print("✓ 敌机已就绪")
 
@@ -208,17 +229,9 @@ async def main():
         print(f"\n敌机最终 ({len(enemies)}):")
         for i, e in enumerate(enemies):
             print(f"  [{i}] pos={e['pos']}")
-            # 期望敌机在玩家前方 (z<-3600)，且在陆地 (z<-5000)
-            if e['pos'][2] > -3600:
-                print(f"    ⚠ 敌机 z={e['pos'][2]} 在玩家后方 (应 <-3600)")
-                ok = False
-            else:
-                # 是否在陆地
-                land_z = -5000
-                if e['pos'][2] > land_z:
-                    print(f"    ⚠ 敌机 z={e['pos'][2]} 在海域 (陆地应 z<-5000)")
-                else:
-                    print(f"    ✓ 敌机 z={e['pos'][2]} 在陆地 (z<-5000)")
+        if enemy_ready and len(enemies) == 0:
+            print("❌ 敌机列表为空")
+            ok = False
 
         # 截图战斗场景
         await page.screenshot(path=str(SCREENSHOTS_DIR / "britain_v2_04_combat.png"))
@@ -229,18 +242,23 @@ async def main():
             async () => {
                 const ocean = window.__shell.scene.getObjectByName('ocean');
                 if (!ocean) return { error: 'no ocean' };
+                const pos = ocean.geometry.attributes.position;
                 const idx = 1000;
-                const y1 = ocean.geometry.attributes.position.getY(idx);
+                // 平海面特化（waveHeight=0 时网格仅 1 段 4 顶点）：顶点不足则跳过波动断言
+                if (pos.count <= idx) return { skipped: true, verts: pos.count };
+                const y1 = pos.getY(idx);
                 const runtime = window.__shell.runtime;
                 runtime.ctx.env.ocean.update(0.1, window.__shell.camera);
                 await new Promise(r => setTimeout(r, 50));
                 runtime.ctx.env.ocean.update(0.1, window.__shell.camera);
-                const y2 = ocean.geometry.attributes.position.getY(idx);
+                const y2 = pos.getY(idx);
                 return { y1: y1.toFixed(3), y2: y2.toFixed(3), delta: (y2-y1).toFixed(3) };
             }
         """)
         print(f"海水顶点[1000] y: {wave}")
-        if "delta" in wave and abs(float(wave["delta"])) > 0.001:
+        if wave.get("skipped"):
+            print(f"✓ 平海面（顶点 {wave.get('verts')}，waveHeight=0 有意为之），跳过波动断言")
+        elif "delta" in wave and abs(float(wave["delta"])) > 0.001:
             print("✓ 海水在更新")
         else:
             print("⚠ 海水未变化")
@@ -287,11 +305,11 @@ async def main():
             print("❌ 巴巴罗萨不应有海洋"); ok = False
         else: print("✓ 巴巴罗萨无海洋")
 
-        # 玩家初始位置应回到默认 (0, 700, 0)（无 playerStart 覆盖）
+        # 玩家初始位置应回到巴巴罗萨出生点 ≈(0, 1500, 0)
         if bar.get("playerPos"):
             bp = bar["playerPos"]
-            if abs(bp[0]) > 200 or abs(bp[2]) > 200 or abs(bp[1] - 700) > 100:
-                print(f"❌ 巴巴罗萨玩家位置错误: {bp} (期望 ≈[0, 700, 0]，允许 ±200)"); ok = False
+            if abs(bp[0]) > 200 or abs(bp[2]) > 200 or abs(bp[1] - 1500) > 150:
+                print(f"❌ 巴巴罗萨玩家位置错误: {bp} (期望 ≈[0, 1500, 0]，允许 ±200)"); ok = False
             else: print(f"✓ 巴巴罗萨玩家位置合理: {bp}")
 
         await page.screenshot(path=str(SCREENSHOTS_DIR / "britain_v2_05_barbarossa.png"))

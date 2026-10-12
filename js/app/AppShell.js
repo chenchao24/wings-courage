@@ -57,7 +57,13 @@ export class AppShell {
 
     // 2. 创建共享 Three.js 资源（保留旧测试场的渲染参数）
     const canvas = document.getElementById('scene');
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    try {
+      this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    } catch (err) {
+      // WebGL 不可用/驱动异常：开机画面写致命错误（停转圈+琥珀文案），throw 给 main.js 保留 splash
+      this._failBoot('您的浏览器不支持 WebGL 或显卡驱动异常，无法运行本游戏');
+      throw err;
+    }
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.shadowMap.enabled = true;
@@ -102,8 +108,11 @@ export class AppShell {
     // 8. 进入封面页
     this.router.go('cover');
 
-    // 调试接口
-    window.__shell = this;
+    // 调试接口：仅本地开发（localhost/127.0.0.1）或显式 ?debug 时挂载（Playwright 打 127.0.0.1 不受影响）
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ||
+        new URLSearchParams(location.search).has('debug')) {
+      window.__shell = this;
+    }
   }
 
   /** 首次用户交互初始化音频（浏览器 AudioContext 策略） */
@@ -175,8 +184,11 @@ export class AppShell {
     }
 
     // 1. 先显示加载遮罩（盖住 #app 与 #scene），再隐藏页面 DOM
-    this.loader.show('加载任务中', levelConfig.name || '', 8000, () => {
-      this._toast('加载超时，已强制进入');
+    //    慢网友好看门狗：8s 未就绪仅提示继续等，60s 硬上限进失败态（不再强制进入裸场景）
+    this.loader.show('加载任务中', levelConfig.name || '', {
+      slowMs: 8000,
+      hardMs: 60000,
+      onHardTimeout: () => console.warn('[AppShell] 关卡加载超 60s 硬上限:', levelConfig.id),
     });
     this.loader.setProgress(15);
 
@@ -206,42 +218,56 @@ export class AppShell {
       this.loader.setProgress(prog);
     }, 200);
 
-    this.runtime.start(levelConfig, {
-      onReady: () => {
-        clearInterval(progTimer);
-        // 飞机已加载、相机首帧已 copy 到位，跳满进度后隐藏遮罩
-        this.loader.setProgress(100);
-        setTimeout(() => this.loader.hide(), 250); // 让 100% 短暂可见再淡出
-      },
-      onPlayerDead: (reason) => {
-        clearInterval(progTimer);
-        this.loader.hide(); // 兜底：若 onReady 未触发就阵亡（理论不会），确保遮罩关闭
-        const stats = this.runtime.getStats();
-        this.audio.stopEngine();
-        // reason='altFence'（脱离作战高度判负）→ 自定义"任务失败"文案；其余走原阵亡文案
-        this._showResult(false, stats, '返回任务选择',
-          reason === 'altFence' ? '任务失败 · MISSION FAILED' : null);
-      },
-      onAllClear: () => {
-        this.runtime.pause(); // 冻结游戏（避免获胜后继续飞行）
-        this.audio.stopEngine();
-        const stats = this.runtime.getStats();
-        this._showResult(true, stats);
-      },
-      onStop: () => {
-        clearInterval(progTimer);
-        this.runtime = null;
-        // 兜底：确保 loading 遮罩关闭（如 start 失败走 catch->stop，onReady 未触发）
-        this.loader.hide();
-        // 出关：#app 恢复显示时仍是简报页（不透明 .page-bg 盖住 #scene），
-        // 随后 router.go 走交叉淡入（机制 A）切到选关页，全程无空帧，无需 loading 遮罩。
-        if (app) app.style.display = '';
-        // 停止引擎音 + 切回菜单配乐
-        this.audio.stopEngine();
-        this._playMenuMusic();
-        this.router.go('level-select');
-      },
-    });
+    // start 内部 catch 已 stop()+rethrow（onStop 负责关遮罩/回退选关页）；
+    // 此处接住 rethrow 消除 unhandled rejection + 用户提示，同步抛错也兜住
+    const rt = this.runtime;
+    const onStartFailed = (err) => {
+      clearInterval(progTimer);
+      this._onStartFailed(err, rt, 'level-select');
+    };
+    let startP;
+    try {
+      startP = rt.start(levelConfig, {
+        onReady: () => {
+          clearInterval(progTimer);
+          // 飞机已加载、相机首帧已 copy 到位，跳满进度后隐藏遮罩
+          this.loader.setProgress(100);
+          setTimeout(() => this.loader.hide(), 250); // 让 100% 短暂可见再淡出
+        },
+        onPlayerDead: (reason) => {
+          clearInterval(progTimer);
+          this.loader.hide(); // 兜底：若 onReady 未触发就阵亡（理论不会），确保遮罩关闭
+          const stats = this.runtime.getStats();
+          this.audio.stopEngine();
+          // reason='altFence'（脱离作战高度判负）→ 自定义"任务失败"文案；其余走原阵亡文案
+          this._showResult(false, stats, '返回任务选择',
+            reason === 'altFence' ? '任务失败 · MISSION FAILED' : null);
+        },
+        onAllClear: () => {
+          this.runtime.pause(); // 冻结游戏（避免获胜后继续飞行）
+          this.audio.stopEngine();
+          const stats = this.runtime.getStats();
+          this._showResult(true, stats);
+        },
+        onStop: () => {
+          clearInterval(progTimer);
+          this.runtime = null;
+          // 兜底：确保 loading 遮罩关闭（如 start 失败走 catch->stop，onReady 未触发）
+          this.loader.hide();
+          // 出关：#app 恢复显示时仍是简报页（不透明 .page-bg 盖住 #scene），
+          // 随后 router.go 走交叉淡入（机制 A）切到选关页，全程无空帧，无需 loading 遮罩。
+          if (app) app.style.display = '';
+          // 停止引擎音 + 切回菜单配乐
+          this.audio.stopEngine();
+          this._playMenuMusic();
+          this.router.go('level-select');
+        },
+      });
+    } catch (err) {
+      onStartFailed(err);
+    }
+    // async 契约下 startP 为 Promise；catch 接住内部 rethrow
+    if (startP && typeof startP.catch === 'function') startP.catch(onStartFailed);
 
     // 切换到战斗配乐（与 runtime.start 并行加载）
     this._playCombatMusic(levelConfig);
@@ -260,8 +286,11 @@ export class AppShell {
       return;
     }
 
-    this.loader.show('加载任务中', mapCfg.name || '自由模式', 8000, () => {
-      this._toast('加载超时，已强制进入');
+    // 慢网友好看门狗：8s 未就绪仅提示继续等，60s 硬上限进失败态（不再强制进入裸场景）
+    this.loader.show('加载任务中', mapCfg.name || '自由模式', {
+      slowMs: 8000,
+      hardMs: 60000,
+      onHardTimeout: () => console.warn('[AppShell] 自由模式加载超 60s 硬上限:', config.mapId),
     });
     this.loader.setProgress(15);
 
@@ -289,41 +318,55 @@ export class AppShell {
       this.loader.setProgress(prog);
     }, 200);
 
-    this.runtime.start(config, {
-      onReady: () => {
-        clearInterval(progTimer);
-        this.loader.setProgress(100);
-        setTimeout(() => this.loader.hide(), 250);
-      },
-      onPlayerDead: () => {
-        clearInterval(progTimer);
-        this.loader.hide();
-        const stats = this.runtime.getStats();
-        this.audio.stopEngine();
-        this._showResult(false, stats, '返回地图选择');
-      },
-      onAllClear: () => {
-        this.runtime.pause();
-        this.audio.stopEngine();
-        const stats = this.runtime.getStats();
-        this._showResult(true, stats, '返回地图选择');
-      },
-      onTimeOver: () => {
-        this.runtime.pause();
-        this.audio.stopEngine();
-        const stats = this.runtime.getStats();
-        this._showResult(true, stats, '返回地图选择', 'TIME UP · 任务完成');
-      },
-      onStop: () => {
-        clearInterval(progTimer);
-        this.runtime = null;
-        this.loader.hide();
-        if (app) app.style.display = '';
-        this.audio.stopEngine();
-        this._playMenuMusic();
-        this.router.go('free-map-select');
-      },
-    });
+    // start 内部 catch 已 stop()+rethrow（onStop 负责关遮罩/回退选图页）；
+    // 此处接住 rethrow 消除 unhandled rejection + 用户提示，同步抛错也兜住
+    const rt = this.runtime;
+    const onStartFailed = (err) => {
+      clearInterval(progTimer);
+      this._onStartFailed(err, rt, 'free-map-select');
+    };
+    let startP;
+    try {
+      startP = rt.start(config, {
+        onReady: () => {
+          clearInterval(progTimer);
+          this.loader.setProgress(100);
+          setTimeout(() => this.loader.hide(), 250);
+        },
+        onPlayerDead: () => {
+          clearInterval(progTimer);
+          this.loader.hide();
+          const stats = this.runtime.getStats();
+          this.audio.stopEngine();
+          this._showResult(false, stats, '返回地图选择');
+        },
+        onAllClear: () => {
+          this.runtime.pause();
+          this.audio.stopEngine();
+          const stats = this.runtime.getStats();
+          this._showResult(true, stats, '返回地图选择');
+        },
+        onTimeOver: () => {
+          this.runtime.pause();
+          this.audio.stopEngine();
+          const stats = this.runtime.getStats();
+          this._showResult(true, stats, '返回地图选择', 'TIME UP · 任务完成');
+        },
+        onStop: () => {
+          clearInterval(progTimer);
+          this.runtime = null;
+          this.loader.hide();
+          if (app) app.style.display = '';
+          this.audio.stopEngine();
+          this._playMenuMusic();
+          this.router.go('free-map-select');
+        },
+      });
+    } catch (err) {
+      onStartFailed(err);
+    }
+    // async 契约下 startP 为 Promise；catch 接住内部 rethrow
+    if (startP && typeof startP.catch === 'function') startP.catch(onStartFailed);
 
     // 自由模式战斗配乐（暂用默认战斗曲）
     this._playCombatMusic({ music: '/sound/adevnAs.mp3' });
@@ -417,6 +460,42 @@ export class AppShell {
       ov.remove();
       if (this.runtime) this.runtime.stop(); // stop → onStop → 回选关
     });
+  }
+
+  /**
+   * 致命启动错误兜底（boot 阶段）：复用开机画面元素写错误信息（failed 类停转圈、文案变琥珀色），
+   * 随后错误抛给 main.js——其 catch 保留 splash 但会覆盖为通用文案，故下一拍恢复本条具体提示。
+   */
+  _failBoot(msg) {
+    const splash = document.getElementById('boot-splash');
+    const el = document.getElementById('boot-splash-msg');
+    if (splash) splash.classList.add('failed');
+    if (el) el.textContent = msg;
+    setTimeout(() => {
+      const s2 = document.getElementById('boot-splash');
+      const m2 = document.getElementById('boot-splash-msg');
+      if (s2) s2.classList.add('failed');
+      if (m2) m2.textContent = msg;
+    }, 0);
+  }
+
+  /**
+   * 关卡/自由模式启动失败兜底：runtime.start 内部 catch 已 stop()+rethrow，
+   * onStop 正常已完成「关遮罩 + 恢复 #app + 路由回退」；此处接住 rethrow 消除
+   * unhandled rejection，防御性复位并提示。rt=发起时的 runtime 实例：
+   * 仍等于 this.runtime 说明 onStop 未跑（异常早于预期），需手动回退。
+   */
+  _onStartFailed(err, rt, backRoute) {
+    console.error('[AppShell] 启动失败:', err);
+    this.loader.hide();
+    const app = document.getElementById('app');
+    if (app) app.style.display = '';
+    if (this.runtime === rt) {
+      this.runtime = null;
+      this.audio.stopEngine();
+      this.router.go(backRoute);
+    }
+    this._toast('任务加载失败，请检查网络后重试');
   }
 
   _toast(msg) {

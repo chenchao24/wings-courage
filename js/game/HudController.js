@@ -54,6 +54,7 @@ export class HudController {
       kills: $('[data-ro="kills"]'),
       target: $('[data-ro="target"]'),
       waves: $('[data-ro="waves"]'),
+      progress: $('.mp-progress'),
       // HP + 读数
       hpBar: $('.hp-bar > i'),
       hpVal: $('[data-ro="hp"]'),
@@ -93,6 +94,7 @@ export class HudController {
     this._fpsLast = 0;
     this._fpsSmooth = 60;
     this._fpsLastText = 0;
+    this._waveHtml = null;   // 波次对号列表 innerHTML 缓存（相同则跳过重排）
 
     this._radarCanvas = $('#radar');
     this._posReadout = document.getElementById('pos-readout');
@@ -240,12 +242,17 @@ export class HudController {
    */
   setWave(current, total, kills, target, state) {
     const e = this._els;
+    // 无波次配置的关卡（sandbox 关 total=0/undefined，如柏林；自由模式不走此分支）：隐藏
+    // 击杀/目标计数与波次对号列表，避免显示无意义的 "0/0"；正常关卡（total>0）原样显示。
+    const noWaves = !total;
+    if (e.progress) e.progress.style.display = noWaves ? 'none' : '';
+    if (e.waves) e.waves.style.display = noWaves ? 'none' : '';
     if (e.kills) e.kills.textContent = kills;
     if (e.target) e.target.textContent = target;
     if (e.wave) e.wave.textContent = Math.min(current, total);
     if (e.wavetotal) e.wavetotal.textContent = total;
-    // 波次对号列表：✓完成 ◆当前 ○待办
-    if (e.waves) {
+    // 波次对号列表：✓完成 ◆当前 ○待办（html 无变化时跳过 innerHTML，避免每帧重建 DOM）
+    if (e.waves && !noWaves) {
       const allDone = state === 'done';
       let html = '';
       for (let i = 1; i <= total; i++) {
@@ -255,7 +262,10 @@ export class HudController {
         else { cls = 'pending'; mark = '○'; }
         html += `<span class="mw ${cls}">${mark}</span>`;
       }
-      e.waves.innerHTML = html;
+      if (html !== this._waveHtml) {
+        e.waves.innerHTML = html;
+        this._waveHtml = html;
+      }
     }
   }
 
@@ -528,6 +538,7 @@ export class HudController {
     this._els = {};
     this._radarCanvas = null;
     this._posReadout = null;
+    this._waveHtml = null;
   }
 }
 

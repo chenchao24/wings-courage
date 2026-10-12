@@ -17,6 +17,8 @@ const _supportTarget = new THREE.Vector3(); // 支援目标点
 const _loiterTarget = new THREE.Vector3(); // 盘旋飞向点临时目标（避免污染共享的 _center）
 const _bomberTarget = new THREE.Vector3(); // 攻击轰炸机时的占位目标点
 const _bomberFwd = new THREE.Vector3();    // 轰炸机前向（临时）
+const _slotDir = new THREE.Vector3();      // 攻击占位左右侧向（临时，即用即弃）
+const _playerFwd = new THREE.Vector3();    // 玩家前向（支援目标计算，即用即弃）
 const _SUPPORT_DIRS = ['rear', 'top', 'left', 'right'];
 
 /**
@@ -1565,12 +1567,12 @@ export class Enemy extends Aircraft {
       _bomberTarget.addScaledVector(_bomberFwd, -400);  // 后方 400m
       _bomberTarget.y -= 250;                            // 下方 250m（爬升攻击）
     } else if (slot === 'left') {
-      const left = new THREE.Vector3().crossVectors(_bomberFwd, _UP).normalize();
+      const left = _slotDir.crossVectors(_bomberFwd, _UP).normalize();
       _bomberTarget.addScaledVector(left, 500);          // 左侧 500m
       _bomberTarget.addScaledVector(_bomberFwd, 100);    // 略前方
       _bomberTarget.y += 100;
     } else if (slot === 'right') {
-      const right = new THREE.Vector3().crossVectors(_UP, _bomberFwd).normalize();
+      const right = _slotDir.crossVectors(_UP, _bomberFwd).normalize();
       _bomberTarget.addScaledVector(right, 500);         // 右侧 500m
       _bomberTarget.addScaledVector(_bomberFwd, 100);    // 略前方
       _bomberTarget.y += 100;
@@ -1659,7 +1661,7 @@ export class Enemy extends Aircraft {
     }
 
     const playerPos = player.root.position;
-    const playerFwd = player.getForward();
+    const playerFwd = player.getForward(_playerFwd);
     _playerRight.set(1, 0, 0).applyQuaternion(player.root.quaternion);
 
     switch (this._supportDir) {
@@ -1667,7 +1669,9 @@ export class Enemy extends Aircraft {
         _supportTarget.copy(playerPos).addScaledVector(playerFwd, -300);
         break;
       case 'top':                                       // 玩家上方 200m + 略后 100m
-        _supportTarget.copy(playerPos).add(new THREE.Vector3(0, 200, 0)).addScaledVector(playerFwd, -100);
+        _supportTarget.copy(playerPos);
+        _supportTarget.y += 200;
+        _supportTarget.addScaledVector(playerFwd, -100);
         break;
       case 'left':                                      // 玩家左侧 250m
         _supportTarget.copy(playerPos).addScaledVector(_playerRight, -250);

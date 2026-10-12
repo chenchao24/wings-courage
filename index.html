@@ -4,13 +4,49 @@
 <meta charset="UTF-8" />
 <link rel="icon" type="image/png" href="/favicon.png" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="《勇气之翼 Wings of Courage》——二战题材网页空战游戏：驾驶史实战机，投身不列颠、巴巴罗萨、库尔斯克与柏林上空的关键战役。" />
+<meta name="theme-color" content="#0b1526" />
+<meta property="og:title" content="勇气之翼 · Wings of Courage" />
+<meta property="og:description" content="二战题材网页空战游戏：驾驶史实战机，投身不列颠、巴巴罗萨、库尔斯克与柏林上空的关键战役。" />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="/img/mb1.webp" />
 <title>勇气之翼 · Wings of Courage</title>
+<style>
+  /* 开机画面：纯 CSS 零依赖（无图片/字体/JS），模块加载完成前即可见；z-index 盖全站 */
+  #boot-splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(180deg,#0b1526 0%,#14263f 45%,#1d3a5c 72%,#0a0f18 100%);color:#dce6f2;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;transition:opacity .45s ease;}
+  #boot-splash.done{opacity:0;pointer-events:none;}
+  #boot-splash h1{margin:0 0 40px;padding:0 20px;font-size:clamp(22px,4.2vw,42px);font-weight:700;letter-spacing:.16em;text-align:center;text-shadow:0 2px 22px rgba(110,160,220,.35);}
+  #boot-splash .spinner{width:44px;height:44px;border-radius:50%;border:3px solid rgba(160,190,220,.16);border-top-color:#d9a441;animation:boot-spin .9s linear infinite;}
+  #boot-splash.failed .spinner{animation:none;border-top-color:rgba(160,190,220,.16);}
+  #boot-splash-msg{margin:20px 0 0;padding:0 24px;font-size:14px;letter-spacing:.18em;color:#a9bccd;text-align:center;line-height:1.8;}
+  #boot-splash.failed #boot-splash-msg{color:#e0a35a;}
+  .noscript-note{position:fixed;left:0;right:0;bottom:12%;z-index:10000;margin:0 auto;max-width:520px;padding:14px 24px;text-align:center;font-size:15px;letter-spacing:.1em;color:#e8c07a;background:rgba(10,14,20,.94);border:1px solid rgba(232,192,122,.35);border-radius:6px;}
+  @keyframes boot-spin{to{transform:rotate(360deg);}}
+</style>
 </head>
 <body>
+  <div id="boot-splash">
+    <h1>勇气之翼 · Wings of Courage</h1>
+    <div class="spinner"></div>
+    <p id="boot-splash-msg">正在加载…</p>
+  </div>
+  <noscript><div class="noscript-note">本游戏需要启用 JavaScript 才能运行，请在浏览器设置中开启后刷新页面。</div></noscript>
+
   <canvas id="scene"></canvas>
   <canvas id="indicator"></canvas>
   <div id="app"></div>
 
+  <script>
+    // 浏览器能力探测：不支持 importmap 时 module 脚本根本不会执行，直接在此给出升级提示
+    (function () {
+      var ok = typeof HTMLScriptElement !== 'undefined' && HTMLScriptElement.supports && HTMLScriptElement.supports('importmap');
+      if (ok) return;
+      var splash = document.getElementById('boot-splash');
+      var msg = document.getElementById('boot-splash-msg');
+      if (msg) msg.textContent = '您的浏览器版本过低，无法运行本游戏，请升级到最新版 Chrome / Edge / Safari / Firefox';
+      if (splash) splash.classList.add('failed'); // 停掉转圈动画
+    })();
+  </script>
   <script type="importmap">
   {
     "imports": {

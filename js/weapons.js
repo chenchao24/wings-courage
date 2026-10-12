@@ -80,6 +80,10 @@ function makeMuzzleFlameTexture() {
 
 // 复用常量
 const _NEG_Z = new THREE.Vector3(0, 0, -1);
+// _spawnAt 热路径 scratch（即用即弃，不传入持久状态；子特效函数内部只用实例 _v/_v2/_q，无别名冲突）
+const _spawnOrigin = new THREE.Vector3();
+const _spawnDir = new THREE.Vector3();
+const _spawnVel = new THREE.Vector3();
 
 /**
  * 武器系统：曳光弹对象池 + 粒子化枪口闪光 + 火花 + 稀薄烟雾。
@@ -206,8 +210,7 @@ export class Weapons {
    * 各机型在 playerConfig.weapons.groups 中配置，实现武器与飞机绑定。
    */
   setWeaponGroups(groups) {
-    const positions = this.aircraft.getMuzzleWorldPositions();
-    const n = positions.length;
+    const n = this.aircraft.muzzleHelpers.length;
     this.muzzleConfigs = new Array(n);
     this.weaponGroups = groups;   // 保留组名与配置，供 update() 检测按下/松开触发组级音效
     this._groupFireState = {};    // groupName → wasFiring（本帧前是否在射击，用于检测按下/松开边沿）
@@ -503,9 +506,9 @@ export class Weapons {
 
   /** 敌机/友机：alternate 轮换选枪口（保留原逻辑，敌机不走武器组配置）*/
   _spawn() {
-    const positions = this.aircraft.getMuzzleWorldPositions();
-    if (!positions.length) return;
-    const idx = this.alternate % positions.length;
+    const n = this.aircraft.muzzleHelpers.length;
+    if (!n) return;
+    const idx = this.alternate % n;
     this.alternate++;
     this._spawnAt(idx);
   }
@@ -516,18 +519,18 @@ export class Weapons {
    * 敌机：muzzleConfigs 为 null，用构造函数默认值 + heavyMuzzleSet 旧接口
    */
   _spawnAt(idx) {
-    const positions = this.aircraft.getMuzzleWorldPositions();
-    if (!positions.length || idx >= positions.length) return;
+    const ac = this.aircraft;
+    const muzzleCount = ac.muzzleHelpers.length;
+    if (!muzzleCount || idx >= muzzleCount) return;
     const mc = this.muzzleConfigs ? this.muzzleConfigs[idx] : null;
     // 机炮枪管过热检查：explosive 机炮过热时跳过发射（机枪不受影响）
     if (mc && mc.explosive && this.cannonOverheated) return;
 
-    const origin = positions[idx];
+    const origin = ac.getMuzzleWorldPosition(idx, _spawnOrigin);
     // 方向：轰炸机自卫炮塔有独立 muzzleDirs（朝后/侧/上），战斗机退化用机头瞄准方向
-    const muzzleDirs = this.aircraft.getMuzzleWorldDirs();
-    const dir = (muzzleDirs && muzzleDirs[idx]) ? muzzleDirs[idx] : this.aircraft.getAimDirection();
+    const hasMuzzleDir = !!(ac.muzzleDirs && ac.muzzleDirs.length && ac.muzzleDirs[idx]);
+    const dir = hasMuzzleDir ? ac.getMuzzleWorldDir(idx, _spawnDir) : ac.getAimDirection(_spawnDir);
     const bulletSpeed = mc ? mc.bulletSpeed : this.bulletSpeed;
-    const vel = dir.clone().multiplyScalar(bulletSpeed).add(this.aircraft.getVelocity());
 
     // 子弹
     const b = this.pool.pop() || this._newBullet();
@@ -538,12 +541,11 @@ export class Weapons {
     // 子弹朝向用发射方向，而不是机体姿态（自卫炮塔朝后时子弹头应朝后）
     b.mesh.quaternion.setFromUnitVectors(_NEG_Z, dir);
     // 材质：玩家机炮橙红 > 玩家机枪金白 > 轰炸机/攻击机后座红橙曳光 > 战斗机金色
-    const isPlayer = this.aircraft && this.aircraft.isPlayer;
-    const isBomber = this.aircraft.aiType === 'bomber';
+    const isPlayer = ac.isPlayer;
+    const isBomber = ac.aiType === 'bomber';
     const isCannon = mc && mc.explosive;
     // 攻击机后座自卫炮塔（muzzleDirs 朝后 z>0）用红橙曳光弹，更醒目
-    const isAttackerRear = !isPlayer && this.aircraft.aiType === 'attacker'
-      && muzzleDirs && muzzleDirs[idx] && muzzleDirs[idx].z > 0;
+    const isAttackerRear = !isPlayer && ac.aiType === 'attacker' && hasMuzzleDir && dir.z > 0;
 
     b.mesh.scale.setScalar(scale);
     b.baseScale = scale;   // 曳光扭曲（warp）脉动的基准尺寸
@@ -562,7 +564,7 @@ export class Weapons {
     }
     this.scene.add(b.mesh);
     b.life = this.life;
-    b.vel.copy(vel);
+    b.vel.copy(dir).multiplyScalar(bulletSpeed).add(ac.getVelocity(_spawnVel));
     // 记录枪口索引和爆炸标志（命中检测用于按枪口取伤害 + 触发机炮碎片）
     b.muzzleIdx = idx;
     b.explosive = mc ? mc.explosive : false;
@@ -667,7 +669,7 @@ export class Weapons {
       const spd = 12 + Math.random() * 18;
       sp.vel.copy(this._v2).multiplyScalar(spd);
       // 继承部分飞机速度（气流裹挟感）
-      sp.vel.addScaledVector(this.aircraft.getVelocity(), 0.3);
+      sp.vel.addScaledVector(this.aircraft.getVelocity(_spawnVel), 0.3);
       const sc = 0.2 + Math.random() * 0.12;
       sp.sprite.scale.set(sc, sc, 1);
       sp.scale0 = sc;

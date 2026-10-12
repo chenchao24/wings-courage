@@ -33,6 +33,12 @@ const _quat = new THREE.Quaternion();
 const _euler = new THREE.Euler();
 const _eiProj = new THREE.Vector3();
 
+// 调试全局挂载门控：仅本地（localhost/127.0.0.1）或 URL 带 ?debug 时暴露
+// window.__aircraft/__freeRuntime（Playwright 回归打 127.0.0.1 依赖这些全局；线上不暴露内部引用）
+const _DEBUG_GLOBALS = typeof location !== 'undefined'
+  && (location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+    || /(?:\?|&)debug(?:[=&#]|$)/.test(location.search));
+
 // 相机模式
 const OBSERVE_MODES = ['rearLeft', 'frontRight', 'top'];
 const CAM_OFFSETS = {
@@ -252,9 +258,11 @@ export class FreeModeRuntime {
       this._elapsed = 0;
       this._animate();
 
-      // 调试接口
-      window.__aircraft = this.player;
-      window.__freeRuntime = this;
+      // 调试接口（仅本地/带 ?debug 时挂载，见模块级 _DEBUG_GLOBALS 门控）
+      if (_DEBUG_GLOBALS) {
+        window.__aircraft = this.player;
+        window.__freeRuntime = this;
+      }
 
       if (this.callbacks.onReady) this.callbacks.onReady();
     } catch (err) {
@@ -338,7 +346,7 @@ export class FreeModeRuntime {
 
     // 5. 云层 + 天空 + 海洋
     if (player.model) {
-      clouds.update(player.root.position, player.getForward(), camera);
+      clouds.update(player.root.position, player.getForward(_fwd), camera);
     }
     if (env.sky) env.sky.position.copy(camera.position);
     if (env.ocean) env.ocean.update(dt, camera);
@@ -438,7 +446,7 @@ export class FreeModeRuntime {
       const ck = this._cockpitCfg;
       _camOff.set(ck.x, ck.y, ck.z).applyQuaternion(ac.quaternion).add(ac.position);
       camera.position.copy(_camOff);
-      _fwd.copy(player.getForward());
+      player.getForward(_fwd);
       _quat.setFromEuler(_euler.set(this._cockpitView.pitch, this._cockpitView.yaw, 0, 'YXZ'));
       _fwd.applyQuaternion(_quat).multiplyScalar(ck.lookDist).add(_camOff);
       camera.lookAt(_fwd);
@@ -451,7 +459,7 @@ export class FreeModeRuntime {
         camera.position.copy(_camOff);
         this._camInited = true;
       }
-      _lookAt.copy(player.getForward()).multiplyScalar(8).add(ac.position);
+      _lookAt.copy(player.getForward(_lookAt)).multiplyScalar(8).add(ac.position);
       camera.lookAt(_lookAt);
     }
 
@@ -472,7 +480,7 @@ export class FreeModeRuntime {
     let crosshair = { x: innerWidth / 2, y: innerHeight / 2, visible: false };
     if (player.model && !player.crashed && this._camMode !== 'observe') {
       const aimDist = this._aimDist;
-      _aimPt.copy(player.getForward()).multiplyScalar(aimDist).add(player.root.position);
+      _aimPt.copy(player.getForward(_aimPt)).multiplyScalar(aimDist).add(player.root.position);
       if (player.aimLift) {
         _upOffset.set(0, 1, 0).applyQuaternion(player.root.quaternion).multiplyScalar(aimDist * player.aimLift);
         _aimPt.add(_upOffset);
@@ -738,16 +746,13 @@ export class FreeModeRuntime {
       ac.weapons.sparkTex?.dispose();
       ac.weapons.debrisGeo?.dispose();
     }
+    // model 材质壳：仅 dispose 实例克隆的材质本身（material.dispose() 不影响共享贴图）。
+    // geometry 与 .map 贴图是 SkeletonUtils.clone 共享资源（同型存活机与 _gltfCache 模板共用），
+    // 实例释放时不得 dispose（与 GameRuntime._disposeAircraft 同模式；共享资源由模型缓存统一管）。
     if (ac.model) {
       ac.model.traverse((o) => {
-        if (o.isMesh) {
-          if (o.geometry) o.geometry.dispose();
-          if (o.material) {
-            (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
-              if (m.map) m.map.dispose();
-              m.dispose();
-            });
-          }
+        if (o.isMesh && o.material) {
+          (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
         }
       });
     }

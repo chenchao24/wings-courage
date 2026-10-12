@@ -6,7 +6,7 @@ import { BasePage } from './_base.js';
  * 右下角显示当前版本号。
  * 背景图已含游戏名称，不再重复显示标题。
  */
-const COVER_BG = ['/img/mb1.png', '/img/mb2.png'];
+const COVER_BG = ['/img/mb1.webp', '/img/mb2.webp'];
 const APP_VERSION = '0.72.8.20';
 
 export class CoverPage extends BasePage {

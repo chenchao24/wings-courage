@@ -55,6 +55,8 @@ const _v3 = new THREE.Vector3();
 const _v4 = new THREE.Vector3();
 const _v5 = new THREE.Vector3();
 const _v6 = new THREE.Vector3();
+// 姿态重建 scratch（_steerTo 每帧用，即用即弃）
+const _e1 = new THREE.Euler();
 // 编队质心/航向专用（_slotWorld 等辅助函数内部会用 _v1/_v2，禁止混用别名）
 const _center = new THREE.Vector3();
 const _dir = new THREE.Vector3();
@@ -172,7 +174,7 @@ export class P51Escort extends Enemy {
     const turnRate = applied / Math.max(dt, 1e-4);
     const targetRoll = THREE.MathUtils.clamp(-sign * turnRate * 0.9, -0.85, 0.85);
     this._roll += THREE.MathUtils.clamp(targetRoll - this._roll, -0.6 * dt, 0.6 * dt);
-    this.root.quaternion.setFromEuler(new THREE.Euler(pitch, yaw, this._roll, 'YXZ'));
+    this.root.quaternion.setFromEuler(_e1.set(pitch, yaw, this._roll, 'YXZ'));
     return dist;
   }
 

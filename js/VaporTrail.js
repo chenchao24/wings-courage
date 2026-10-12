@@ -162,7 +162,7 @@ export class VaporTrail {
     const ac = this.aircraft;
     const tips = ac.getWingTipWorldPositions ? ac.getWingTipWorldPositions() : null;
     if (!tips) return;
-    this._fwd.copy(ac.getForward());
+    ac.getForward(this._fwd);
     // 宽度方向：垂直于飞行方向，在水平面（forward × up）；近垂直时回退 forward × right
     this._side.crossVectors(this._fwd, _UP);
     if (this._side.lengthSq() < 0.01) this._side.crossVectors(this._fwd, _RIGHT);

@@ -8,6 +8,11 @@ import { VaporTrail } from './VaporTrail.js';
 // 世界坐标轴常量（俯仰绕世界 X 轴，保证筋斗完整一圈）
 const _WORLD_X = new THREE.Vector3(1, 0, 0);
 
+// 热路径复用临时向量（updateFlight/getAimDirection 等每帧使用，避免逐帧 new 分配；
+// 仅作"即用即弃"的 scratch——写入后立即读取，不得跨语句/跨调用持有其引用）
+const _tmpV1 = new THREE.Vector3();
+const _tmpV2 = new THREE.Vector3();
+
 // glTF 模型缓存：url → gltf（原始模板，永不修改场景图）
 // 首次 load 时缓存，后续实例用 SkeletonUtils.clone() 克隆，省去重复网络/解析开销
 const _gltfCache = new Map();
@@ -405,30 +410,40 @@ export class Aircraft {
       const loader = new GLTFLoader();
       // 预置 DRACO 解码器：若模型已 Draco 压缩可正常加载，未压缩则不会触发，零副作用
       const draco = new DRACOLoader();
-      draco.setDecoderPath('/node_modules/three/examples/jsm/libs/draco/');
+      draco.setDecoderPath('/vendor/three/examples/jsm/libs/draco/');
       loader.setDRACOLoader(draco);
       // meshopt 解码器：优化版模型使用 EXT_meshopt_compression，必须注册否则报错
       loader.setMeshoptDecoder(MeshoptDecoder);
       // WebP 纹理（EXT_texture_webp）three 0.160 内置支持，无需额外配置
 
-      gltf = await loader.loadAsync(url, (e) => onProgress && onProgress(e));
+      try {
+        gltf = await loader.loadAsync(url, (e) => onProgress && onProgress(e));
 
-      // 对原始模板做一次性处理（材质提亮 + 阴影设置）
-      // SkeletonUtils.clone() 共享材质引用，所以只在模板上做一次，克隆体继承
-      gltf.scene.traverse((o) => {
-        if (o.isMesh) {
-          o.castShadow = true;
-          o.receiveShadow = true;
-          // 部分模型材质偏暗，略提亮
-          if (o.material) {
-            (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
-              if (m.roughness !== undefined) m.roughness = Math.min(1, m.roughness + 0.05);
-            });
+        // 对原始模板做一次性处理（材质提亮 + 阴影设置）
+        // SkeletonUtils.clone() 共享材质引用，所以只在模板上做一次，克隆体继承
+        gltf.scene.traverse((o) => {
+          if (o.isMesh) {
+            o.castShadow = true;
+            o.receiveShadow = true;
+            // 部分模型材质偏暗，略提亮
+            if (o.material) {
+              (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+                if (m.roughness !== undefined) m.roughness = Math.min(1, m.roughness + 0.05);
+              });
+            }
           }
-        }
-      });
+        });
 
-      _gltfCache.set(url, gltf);
+        _gltfCache.set(url, gltf);
+      } catch (err) {
+        // 清掉失败条目：避免缓存住失败结果导致后续 load(url) 永远失败；
+        // 包装成带 url 的明确 Error 继续抛出（调用方 GameRuntime 会 catch）
+        _gltfCache.delete(url);
+        throw new Error(
+          `[Aircraft] 模型加载失败: ${url} (${err && err.message ? err.message : err})`,
+          { cause: err }
+        );
+      }
     }
 
     // 克隆场景图（每个实例独立，SkeletonUtils.clone 处理骨骼/动画绑定）
@@ -820,7 +835,6 @@ export class Aircraft {
     const cutZ = hubModel.z;        // 切割 z 阈值（model 局部空间，桨毂前方）
     const minDist = 1.2;            // 离中心轴最小距离（小于此视为机身，不切割）
 
-    let totalShrunk = 0;
     this.model.traverse((o) => {
       if (!o.isMesh || !o.geometry) return;
       const geo = o.geometry;
@@ -837,7 +851,6 @@ export class Aircraft {
           v.y *= 0.08;
           pos.setXYZ(i, v.x, v.y, v.z);
           modified = true;
-          totalShrunk++;
         }
       }
       if (modified) {
@@ -845,10 +858,6 @@ export class Aircraft {
         geo.computeVertexNormals();  // 重算法线保持光照
       }
     });
-
-    if (totalShrunk > 0) {
-      console.log(`[Prop] 静态桨叶顶点已收缩: ${totalShrunk} 个`);
-    }
   }
 
   /**
@@ -1359,6 +1368,30 @@ export class Aircraft {
   }
 
   /**
+   * 单个枪口的世界坐标（索引版，避免 getMuzzleWorldPositions 的全量数组+向量分配）。
+   * 逻辑与全量版一致（muzzleHelpers[i].getWorldPosition），仅计算指定索引。
+   * @param {number} index 枪口索引（与 muzzleHelpers / muzzleOffsets 顺序一致）
+   * @param {THREE.Vector3} [target] 可选输出向量；缺省分配新 Vector3
+   * @returns {THREE.Vector3}
+   */
+  getMuzzleWorldPosition(index, target = new THREE.Vector3()) {
+    return this.muzzleHelpers[index].getWorldPosition(target);
+  }
+
+  /**
+   * 单个枪口的世界方向（索引版，语义与 getMuzzleWorldDirs 完全一致）：
+   * body frame 单位向量经 root 旋转变换到世界坐标并归一化。
+   * 无 muzzleDirs 时返回 null（调用方退化用 getAimDirection()）。
+   * @param {number} index 枪口索引（与 muzzleDirs 顺序一致）
+   * @param {THREE.Vector3} [target] 可选输出向量；缺省分配新 Vector3
+   * @returns {THREE.Vector3|null}
+   */
+  getMuzzleWorldDir(index, target = new THREE.Vector3()) {
+    if (!this.muzzleDirs || !this.muzzleDirs.length) return null;
+    return target.copy(this.muzzleDirs[index]).applyQuaternion(this.root.quaternion).normalize();
+  }
+
+  /**
    * 翼尖世界坐标（左右两个，用于拉烟）。
    * X 用模型包围盒极值（机翼最外侧/最宽处），Y/Z 用最靠外枪口近似（机翼高度/前后）。
    * 首次调用时懒计算并缓存到 _wingTipLocal（root 局部坐标）。
@@ -1415,8 +1448,13 @@ export class Aircraft {
     ];
   }
 
-  getForward() {
-    return new THREE.Vector3(0, 0, -1).applyQuaternion(this.root.quaternion);
+  /**
+   * 机头前向（世界坐标，归一化）。
+   * @param {THREE.Vector3} [target] 可选输出向量：传入则写入并返回它（零分配）；
+   *   缺省分配新 Vector3（与原行为一致，现有调用点零改动）。
+   */
+  getForward(target = new THREE.Vector3()) {
+    return target.set(0, 0, -1).applyQuaternion(this.root.quaternion);
   }
 
   /**
@@ -1426,15 +1464,21 @@ export class Aircraft {
    *   ⇒ 方向 = normalize(forward + up*aimLift)
    * 这样座舱模式下准星指向与子弹落点重合，修正"瞄高打低"偏差。
    * 追尾等模式 aimLift=0，退化为 getForward()。
+   * @param {THREE.Vector3} [target] 可选输出向量（同 getForward）
    */
-  getAimDirection() {
-    const fwd = this.getForward();
+  getAimDirection(target = new THREE.Vector3()) {
+    const fwd = this.getForward(target);
     if (!this.aimLift) return fwd;
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.root.quaternion);
+    const up = _tmpV2.set(0, 1, 0).applyQuaternion(this.root.quaternion);
     return fwd.add(up.multiplyScalar(this.aimLift)).normalize();
   }
-  getVelocity() {
-    return this.getForward().multiplyScalar(this.speed);
+
+  /**
+   * 速度向量（机头前向 × 当前速度；Weapons 子弹发射叠加用）。
+   * @param {THREE.Vector3} [target] 可选输出向量（同 getForward）
+   */
+  getVelocity(target = new THREE.Vector3()) {
+    return this.getForward(target).multiplyScalar(this.speed);
   }
 
   // ---------- 飞行物理（街机式，打磨版）----------
@@ -1465,7 +1509,7 @@ export class Aircraft {
     // 俯冲额外加速（街机特色：机头朝下加速、朝上减速，轻度能量感）
     // diveAccel=0 时完全跳过，Bf109 等未配置机型走原版纯油门模型
     if (this.diveAccel > 0) {
-      const fwd = this.getForward();
+      const fwd = this.getForward(_tmpV1);
       const diveFactor = -fwd.y;  // 机头朝下为正(0~1)，朝上为负(-1~0)
       if (diveFactor !== 0) {
         this.speed += diveFactor * this.diveAccel * dt;
@@ -1478,7 +1522,7 @@ export class Aircraft {
     }
 
     // 当前姿态：滚转角（仅用于滚转-偏航耦合，取 right 轴在水平面的倾斜）
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.root.quaternion);
+    const right = _tmpV2.set(1, 0, 0).applyQuaternion(this.root.quaternion);
     const rollAngle = Math.atan2(right.y, 1);
 
     // 低速时俯仰舵效衰减（保证筋斗顶部低速仍能继续翻转，下限 0.6）
@@ -1517,7 +1561,7 @@ export class Aircraft {
     if (this.angVel.z) this.root.rotateZ(this.angVel.z * dt);
 
     // 前飞
-    const forward = this.getForward();
+    const forward = this.getForward(_tmpV1);
     this.root.position.addScaledVector(forward, this.speed * dt);
 
     // 重力 / 升力（街机版）：升力始终沿世界 Y 向上，随速度变化。

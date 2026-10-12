@@ -12,7 +12,7 @@ export default {
   name: '巴巴罗萨之鹰',
   subtitle: 'Operation Barbarossa',
   date: '1941.06.22',
-  cardImage: '/img/stg2.png',
+  cardImage: '/img/stg2.webp',
   difficulty: 1,
   beginner: true,
   briefing:

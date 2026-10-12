@@ -20,7 +20,7 @@ export default {
   name: '风云不列颠',
   subtitle: 'Battle of Britain',
   date: '1940.09.15',
-  cardImage: '/img/stg1.png',
+  cardImage: '/img/stg1.webp',
   difficulty: 2,
   briefing:
     '1940 年 9 月 15 日，不列颠战役的关键一天。你驾驶 Bf 109 E-4 从法国海岸起飞，' +
@@ -180,7 +180,8 @@ export default {
       color: 0xe8d8b8,
     },
 
-    // 雾：海峡典型浓雾（临时关闭用于诊断"陆地全白"问题，确认效果后调整）
+    // 雾：density 有意保持 0（诊断遗留：开启雾效曾导致海面/陆地泛白，上线前不冒复发风险，
+    //   待后续专项排查雾色与光照/海面交互后再恢复；color 保留供届时启用）
     fog: {
       color: 0xb8c4d0,
       density: 0,

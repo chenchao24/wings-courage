@@ -1,8 +1,19 @@
 # darkWil · 功能迭代时间线
 
-> 按时间正序记录功能迭代。详细设计与算法见 [DESIGN.md](./DESIGN.md)，Bug 修复见 [DEBUG_BUG_LOG.md](./DEBUG_BUG_LOG.md)。
+> 按时间正序记录功能迭代。详细设计与算法见 [DESIGN.md](./archive/DESIGN.md)，Bug 修复见 [DEBUG_BUG_LOG.md](./archive/DEBUG_BUG_LOG.md)。
 
 ---
+
+## 2026-10-12
+
+### #84 上线前优化与仓库重组
+- **仓库化**：git 初始化 + `.gitignore`；目录重组（12 个调参页 + tune js → `tools/`，历史文档 → `docs/archive/`，一次性诊断脚本 → `tests/python/_diag/`，改前备份/废弃脚本 → `_archive/`（gitignored））；删除 `dist/` 过期构建、编辑器残留目录与未引用资产 ~13MB；README/PROJECT_INDEX 重写
+- **资产瘦身**：17 个 GLB meshopt 压缩（model/ 74→36.5MB；me_262/fw190 双型追加纹理 ≤1024+webp，经 `scripts/compress_textures_webp.mjs`）；img/ 21→3.5MB（全部转 webp + 柏林地面图 4096 重压缩 11.4→2.9MB）；新增 `scripts/verify_glb.mjs` 校验工具；原始备份与压缩产物均在 `_archive/precompress/`
+- **首屏与容错**：开机画面 boot-splash（纯 CSS）+ importmap 能力探测 + noscript + meta/OG；WebGL 创建失败兜底；模型加载失败链闭环（aircraft.load 抛带 url 的 Error → AppShell catch → toast + 回退选关）；LoadingOverlay 慢网模式（8s 提示继续等 / 60s 硬超时刷新按钮，替代原 8s 强制进入）；柏林卫星贴图 404 兜底纯色纹理
+- **性能**：HUD setWave 字符串缓存（消除每帧 innerHTML 重建）；aircraft getter 可选 out 参数化（getForward/getVelocity/getAimDirection/新增 getMuzzleWorldPosition/Dir 索引版）；B-17 炮塔瞄准、子弹生成、敌机 AI、雷达渐变等热路径消除每帧分配；**修复克隆实例 dispose 误释放共享 geometry/贴图**（B-17 中途脱离导致同型机 GPU 资源重传卡顿）；柏林 sandbox HUD 不再显示 "0/0"
+- **部署**：`_headers`（Pages 缓存策略）+ `.assetsignore`（排除 node_modules/tools/tests 等 + 3 个管线备份 glb）+ `docs/DEPLOY.md`；DRACO 解码器迁入 `vendor/`（不再依赖 /node_modules）；调试全局（__shell/__aircraft 等）改为仅 localhost/?debug 挂载
+- **测试**：test_britain_level.py 现代化（ESC 跳过剧情过场后验证敌机生成，修 GBK 编码与平海面顶点断言）；全量回归绿：campaign 三关 + berlin + britain
+- **注意**：重跑 `scripts/optimize_b17.mjs`/`optimize_p51.mjs` 会重新生成未压缩 glb，需补跑 meshopt
 
 ## 2026-07-31
 

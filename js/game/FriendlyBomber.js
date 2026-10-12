@@ -497,17 +497,17 @@ export class FriendlyBomber extends Aircraft {
     if (this.model) this.model.visible = false;
   }
 
-  getForward() {
-    return new THREE.Vector3(0, 0, -1).applyQuaternion(this.root.quaternion);
+  getForward(target = new THREE.Vector3()) {
+    return target.set(0, 0, -1).applyQuaternion(this.root.quaternion);
   }
 
-  /** 速度向量（Weapons 子弹发射时叠加飞机速度用） */
-  getVelocity() {
-    return this.getForward().multiplyScalar(this._cruiseSpeed);
+  /** 速度向量（Weapons 子弹发射时叠加飞机速度用）；target 可选输出向量（同 Aircraft 约定） */
+  getVelocity(target = new THREE.Vector3()) {
+    return this.getForward(target).multiplyScalar(this._cruiseSpeed);
   }
 
   /** 瞄准方向（退化用机头前向，自卫炮塔有 muzzleDirs 时 Weapons 优先用独立方向） */
-  getAimDirection() {
-    return this.getForward();
+  getAimDirection(target = new THREE.Vector3()) {
+    return this.getForward(target);
   }
 }

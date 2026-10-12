@@ -39,6 +39,14 @@ const _toE = new THREE.Vector3();
 const _eiProj = new THREE.Vector3();
 // 锁定警告用：敌机→玩家向量
 const _toP = new THREE.Vector3();
+// 锁定警告用：敌机前向（getForward 输出，即用即弃）
+const _enFwd = new THREE.Vector3();
+
+// 调试全局挂载门控：仅本地（localhost/127.0.0.1）或 URL 带 ?debug 时暴露
+// window.__aircraft/__debug（Playwright 回归打 127.0.0.1 依赖这些全局；线上不暴露内部引用）
+const _DEBUG_GLOBALS = typeof location !== 'undefined'
+  && (location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+    || /(?:\?|&)debug(?:[=&#]|$)/.test(location.search));
 
 // ---------- 相机模式 ----------
 // C 键：追尾(chase) ↔ 座舱(cockpit) 二选一
@@ -416,17 +424,19 @@ export class GameRuntime {
         this.dialogSystem.show(d.speaker, d.text, 8000, d.avatar || 'commander', d.role);
       }
 
-      // 调试接口
-      window.__aircraft = this.player;
-      window.__debug = {
-        clouds: this.ctx.clouds,
-        camera: this.ctx.camera,
-        renderer: this.ctx.renderer,
-        env: this.ctx.env,
-        enemies: this.enemies,
-        waveDirector: this.waveDirector,
-        runtime: this,
-      };
+      // 调试接口（仅本地/带 ?debug 时挂载，见模块级 _DEBUG_GLOBALS 门控）
+      if (_DEBUG_GLOBALS) {
+        window.__aircraft = this.player;
+        window.__debug = {
+          clouds: this.ctx.clouds,
+          camera: this.ctx.camera,
+          renderer: this.ctx.renderer,
+          env: this.ctx.env,
+          enemies: this.enemies,
+          waveDirector: this.waveDirector,
+          runtime: this,
+        };
+      }
 
       if (this.callbacks.onReady) this.callbacks.onReady();
     } catch (err) {
@@ -1046,7 +1056,7 @@ export class GameRuntime {
         const baseSpd = this._cinematicBaseSpeed || player.speed;
         const baseAlt = this._cinematicBaseAlt || player.root.position.y;
         player.speed = baseSpd + Math.sin(t * 0.3) * 3;        // 速度 ±3 小幅波动
-        player.root.position.addScaledVector(player.getForward(), player.speed * dt);
+        player.root.position.addScaledVector(player.getForward(_fwd), player.speed * dt);
         const targetY = baseAlt + Math.sin(t * 0.15) * 5;       // 高度 ±5 小幅波动
         player.root.position.y += (targetY - player.root.position.y) * Math.min(1, dt * 2);
         player.update(dt);
@@ -1117,20 +1127,30 @@ export class GameRuntime {
     if (this.wingmen262) this.wingmen262.update(dt);
 
     // 3.6 剧情编队组推进（哈通/Adler/Falke-2，分兵后驶离组 despawn 由 CinematicSystem 管理）
+    //     直接遍历（原 [...].filter(Boolean) 每帧每组 2 次数组分配）
     for (const grp of this._cinematicFormations) {
-      const members = [grp.leader, ...(grp.wingmen || [])].filter(Boolean);
-      for (const m of members) {
-        if (!m.ready || m._despawnRequested) continue;
-        m.updateAll(dt, player);
+      if (grp.leader && grp.leader.ready && !grp.leader._despawnRequested) grp.leader.updateAll(dt, player);
+      if (grp.wingmen) {
+        for (const m of grp.wingmen) {
+          if (!m || !m.ready || m._despawnRequested) continue;
+          m.updateAll(dt, player);
+        }
       }
     }
-    // 清理已 despawn 的剧情编队组成员资源
-    for (const grp of this._cinematicFormations.slice()) {
-      const members = [grp.leader, ...(grp.wingmen || [])].filter(Boolean);
-      if (members.every((m) => m._despawnRequested)) {
-        for (const m of members) this._disposeAircraft(m);
-        const i = this._cinematicFormations.indexOf(grp);
-        if (i >= 0) this._cinematicFormations.splice(i, 1);
+    // 清理已 despawn 的剧情编队组成员资源（倒序遍历，splice 安全；空成员组等价 every([])===true 同样移除）
+    for (let gi = this._cinematicFormations.length - 1; gi >= 0; gi--) {
+      const grp = this._cinematicFormations[gi];
+      let allDespawn = true;
+      if (grp.leader && !grp.leader._despawnRequested) allDespawn = false;
+      if (allDespawn && grp.wingmen) {
+        for (const m of grp.wingmen) {
+          if (m && !m._despawnRequested) { allDespawn = false; break; }
+        }
+      }
+      if (allDespawn) {
+        if (grp.leader) this._disposeAircraft(grp.leader);
+        if (grp.wingmen) for (const m of grp.wingmen) { if (m) this._disposeAircraft(m); }
+        this._cinematicFormations.splice(gi, 1);
       }
     }
 
@@ -1200,13 +1220,13 @@ export class GameRuntime {
 
     // 6. 云层跟随玩家循环回收 + 天空球跟随相机 + 海洋波浪
     if (player.model) {
-      clouds.update(player.root.position, player.getForward(), camera);
+      clouds.update(player.root.position, player.getForward(_fwd), camera);
     }
     if (env.sky) env.sky.position.copy(camera.position);
     if (env.ocean) env.ocean.update(dt, camera);
     if (env.updateSkyClouds) env.updateSkyClouds(dt);
     if (env.battlefield) env.battlefield.update(dt, this.player?.position);   // 库尔斯克战场物件（含距离剔除）
-    if (env.flak) env.flak.update(dt, this.player?.root?.position, this.ctx.camera, this.player?.getForward?.(), this.ctx.audio, this.bomberStream); // 防空火力 Flak 视觉+音效（corridor 模式用机群位置）
+    if (env.flak) env.flak.update(dt, this.player?.root?.position, this.ctx.camera, this.player ? this.player.getForward(_fwd) : undefined, this.ctx.audio, this.bomberStream); // 防空火力 Flak 视觉+音效（corridor 模式用机群位置）
 
     // 6.5 关卡音乐：计算最近敌机距离，驱动主题曲/战斗高潮曲切换
     //     用距离平方比较避免开方（triggerRadius 在 update 内平方比较）
@@ -1439,7 +1459,7 @@ export class GameRuntime {
     if (!player || !player.model || player.crashed) { this._tailLocked = false; return; }
 
     const pPos = player.root.position;
-    _fwd.copy(player.getForward()); // 玩家前向（机头 = -Z）
+    player.getForward(_fwd); // 玩家前向（机头 = -Z）
 
     let lockEnemy = null;
     // P-51 护航编队同样触发咬尾警告（仅 escortP51 关卡；其他关 hostiles = enemies 原行为）
@@ -1454,7 +1474,7 @@ export class GameRuntime {
       if (_toE.dot(_fwd) > -0.1) continue;
       // 敌机机头朝向玩家（敌机前向与"敌机→玩家"夹角 < ~18°，进入射击锥）
       _toP.copy(pPos).sub(en.root.position).normalize();
-      if (en.getForward().dot(_toP) > 0.95) {
+      if (en.getForward(_enFwd).dot(_toP) > 0.95) {
         lockEnemy = en;
         break;
       }
@@ -1718,7 +1738,7 @@ export class GameRuntime {
         .applyQuaternion(ac.quaternion).add(ac.position);
       camera.position.copy(_camOff);
       // 前视方向 + 右键视野偏移（视线从相机位置出发，沿机头前方 lookDist 远）
-      _fwd.copy(player.getForward());
+      player.getForward(_fwd);
       _quat.setFromEuler(_euler.set(this._cockpitView.pitch, this._cockpitView.yaw, 0, 'YXZ'));
       _fwd.applyQuaternion(_quat).multiplyScalar(ck.lookDist).add(_camOff);
       camera.lookAt(_fwd);
@@ -1733,7 +1753,7 @@ export class GameRuntime {
         camera.position.copy(_camOff);
         this._camInited = true;
       }
-      _lookAt.copy(player.getForward()).multiplyScalar(8).add(ac.position);
+      _lookAt.copy(player.getForward(_lookAt)).multiplyScalar(8).add(ac.position);
       camera.lookAt(_lookAt);
     }
 
@@ -1758,7 +1778,7 @@ export class GameRuntime {
     const cinematicActive = this._cinematicActive && this.cinematic && this.cinematic.active;
     if (player.model && !player.crashed && this._camMode !== 'observe' && !cinematicActive) {
       const aimDist = this._aimDist;
-      _aimPt.copy(player.getForward()).multiplyScalar(aimDist).add(player.root.position);
+      _aimPt.copy(player.getForward(_aimPt)).multiplyScalar(aimDist).add(player.root.position);
       // 座舱模式：瞄准点向上抬高，让准星落在视野中上部（aimLift 同时驱动子弹方向，保证重合 #14）
       if (player.aimLift) {
         _upOffset.set(0, 1, 0).applyQuaternion(player.root.quaternion).multiplyScalar(aimDist * player.aimLift);
@@ -1973,17 +1993,14 @@ export class GameRuntime {
       ac.weapons.sparkTex?.dispose();
       ac.weapons.debrisGeo?.dispose();                              // 碎片几何体
     }
-    // model geometry/material
+    // model 材质壳：仅 dispose 实例克隆的材质本身（material.dispose() 不影响共享贴图）。
+    // geometry 与 .map 贴图是 SkeletonUtils.clone 共享资源（同型存活机与 _gltfCache 模板共用），
+    // 实例释放时不得 dispose——否则关卡中途 despawn 单架（B-17 脱离返航/WaveDirector disposeEnemy）
+    // 会静默释放共享资源，three 下次渲染触发重传卡顿；共享资源由模型缓存生命周期统一管。
     if (ac.model) {
       ac.model.traverse((o) => {
-        if (o.isMesh) {
-          if (o.geometry) o.geometry.dispose();
-          if (o.material) {
-            (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
-              if (m.map) m.map.dispose();
-              m.dispose();
-            });
-          }
+        if (o.isMesh && o.material) {
+          (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
         }
       });
     }

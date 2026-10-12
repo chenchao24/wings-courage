@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 
+// 玩家前向 scratch（update 内即用即弃，不存储引用）
+const _fwdR = new THREE.Vector3();
+
 /**
  * 雷达 HUD：右下角圆形雷达，玩家居中、机头朝上。
  *
@@ -53,6 +56,18 @@ export class Radar {
     return Math.atan2(fwd.x, fwd.z);
   }
 
+  /** 扫描线渐变（按半径缓存，与底色渐变同理避免每帧 createLinearGradient） */
+  _getSweepGrad(r) {
+    if (!this._sweepGrad || this._sweepGradR !== r) {
+      const sg = this.ctx.createLinearGradient(0, 0, 0, -r);
+      sg.addColorStop(0, 'rgba(111,208,255,0.32)');
+      sg.addColorStop(1, 'rgba(111,208,255,0)');
+      this._sweepGrad = sg;
+      this._sweepGradR = r;
+    }
+    return this._sweepGrad;
+  }
+
   update() {
     if (!this.visible) return;
     const ctx = this.ctx;
@@ -65,11 +80,15 @@ export class Radar {
     ctx.beginPath();
     ctx.arc(cx, cy, r - 1, 0, Math.PI * 2);
     ctx.clip();
-    // 底色渐变
-    const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    bg.addColorStop(0, 'rgba(10,30,28,0.82)');
-    bg.addColorStop(1, 'rgba(6,16,18,0.82)');
-    ctx.fillStyle = bg;
+    // 底色渐变（按半径缓存，仅 resize 后 r 变化才重建；渐变对象随 ctx 长期有效）
+    if (!this._bgGrad || this._bgGradR !== r) {
+      const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      bg.addColorStop(0, 'rgba(10,30,28,0.82)');
+      bg.addColorStop(1, 'rgba(6,16,18,0.82)');
+      this._bgGrad = bg;
+      this._bgGradR = r;
+    }
+    ctx.fillStyle = this._bgGrad;
     ctx.fillRect(0, 0, this.cssSize, this.cssSize);
 
     // ---------- 网格：距离圈 + 十字线 ----------
@@ -91,9 +110,7 @@ export class Radar {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(sweep);
-    const sg = ctx.createLinearGradient(0, 0, 0, -r);
-    sg.addColorStop(0, 'rgba(111,208,255,0.32)');
-    sg.addColorStop(1, 'rgba(111,208,255,0)');
+    const sg = this._getSweepGrad(r);
     ctx.fillStyle = sg;
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -105,7 +122,7 @@ export class Radar {
     // ---------- 玩家与前向 ----------
     if (!this.ac || !this.ac.model) { ctx.restore(); return; }
     const acp = this.ac.root.position;
-    const fwd = this.ac.getForward();
+    const fwd = this.ac.getForward(_fwdR);
     const fa = this._forwardAngle(fwd);
 
     // 玩家朝向三角（中心，指向上方=机头前）

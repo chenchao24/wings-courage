@@ -4,6 +4,11 @@ import { Enemy } from '../enemy.js';
 // 返航转向复用（避免每帧 new）
 const _UP_Y = new THREE.Vector3(0, 1, 0);
 const _rtbTargetQuat = new THREE.Quaternion();
+// 热路径 scratch（即用即弃，不得跨语句持有）：姿态欧拉角 / 前向 / 目标速度 / 枪口世界坐标
+const _tmpEuler = new THREE.Euler();
+const _tmpFwd = new THREE.Vector3();
+const _tmpVel = new THREE.Vector3();
+const _tmpMuzzlePos = new THREE.Vector3();
 // 大块零件几何（程序模拟：翼段/机身段/方块）
 const _bigDebrisGeos = [
   new THREE.BoxGeometry(3.2, 0.5, 1.6),
@@ -207,7 +212,7 @@ export class HeavyBomber extends Enemy {
     // 下会变慢成"原地盘旋悬停"假象；rotateTowards 保证按 _rtbTurnRate 收敛）
     _rtbTargetQuat.setFromAxisAngle(_UP_Y, -Math.PI / 2);
     this.root.quaternion.rotateTowards(_rtbTargetQuat, this._rtbTurnRate * dt);
-    this.root.position.addScaledVector(this.getForward(), this._rtbSpeed * this._speedFactor * dt);
+    this.root.position.addScaledVector(this.getForward(_tmpFwd), this._rtbSpeed * this._speedFactor * dt);
     this.root.position.y -= this._rtbSink * dt;
     this._applyResidualWobble(dt);
     if (this.root.position.y < 1200) this.root.position.y = 1200;
@@ -234,7 +239,7 @@ export class HeavyBomber extends Enemy {
     // 记录本帧扰动偏移（状态切换时转入 _residualWob 衰减，防位置跳变）
     this._wobOffset.copy(this._v1).multiplyScalar(ox)
       .addScaledVector(this._v2, oy).addScaledVector(this._v3, oz);
-    this._q1.setFromEuler(new THREE.Euler(
+    this._q1.setFromEuler(_tmpEuler.set(
       Math.sin(t * 0.23 + w.p2) * w.rollAmp * 0.5,
       0,
       Math.sin(t * 0.31 + w.p1) * w.rollAmp,
@@ -340,13 +345,13 @@ export class HeavyBomber extends Enemy {
   _updateSlowCrash(dt) {
     // 减速下坠：固定俯角，拉坠毁浓烟
     const spd = this.cruise * this._speedFactor * 0.7;
-    const fwd = this.getForward();
+    const fwd = this.getForward(_tmpFwd);
     this.root.position.addScaledVector(fwd, spd * Math.cos(this._slowPitch) * dt);
     this.root.position.y -= spd * Math.sin(this._slowPitch) * dt;
     this._applyResidualWobble(dt);
     // 姿态非常缓慢地压到俯角（保持航向；0.10 rad/s ≈ 5.7°/s，重型轰炸机无突兀姿态变化）
     const yaw = Math.atan2(-fwd.x, -fwd.z);
-    this._q1.setFromEuler(new THREE.Euler(-this._slowPitch, yaw, 0, 'YXZ'));
+    this._q1.setFromEuler(_tmpEuler.set(-this._slowPitch, yaw, 0, 'YXZ'));
     this.root.quaternion.rotateTowards(this._q1, 0.10 * dt);
     // 坠毁浓烟（机身后拖，大烟团；灰阶随机层次，0.7 不透明度防过浓失真）
     this._crashSmokeAcc += dt * 24;
@@ -373,10 +378,9 @@ export class HeavyBomber extends Enemy {
     this._rtb = false;
     this._residualWob.copy(this._wobOffset);   // 编队扰动残余偏移 → 平滑抹平，消除位置跳变
     this._residualWobK = 1;
-    const fwd = this.getForward();
     const diveMax = this.cruise * 1.8;   // 坠毁极速基准
     // 姿态初值直接取当前四元数（含扰动残量），进入坠毁零瞬跳
-    const e0 = new THREE.Euler().setFromQuaternion(this.root.quaternion, 'YXZ');
+    const e0 = _tmpEuler.setFromQuaternion(this.root.quaternion, 'YXZ');
     const c = this._crash = {
       mode,
       yaw: e0.y,
@@ -420,9 +424,9 @@ export class HeavyBomber extends Enemy {
       const rr = THREE.MathUtils.degToRad(5) * dt;
       c.rollAngle += THREE.MathUtils.clamp(c.rollTarget - c.rollAngle, -rr, rr);
     }
-    this._q1.setFromEuler(new THREE.Euler(c.pitch, c.yaw, c.rollAngle, 'YXZ'));
+    this._q1.setFromEuler(_tmpEuler.set(c.pitch, c.yaw, c.rollAngle, 'YXZ'));
     this.root.quaternion.copy(this._q1);
-    const fwd = this.getForward();
+    const fwd = this.getForward(_tmpFwd);
     this.root.position.addScaledVector(fwd, c.speed * dt);
     this._applyResidualWobble(dt);
 
@@ -542,7 +546,7 @@ export class HeavyBomber extends Enemy {
   // ---------- 大块零件/小碎片（一直下落，>1000m 消失） ----------
   _spawnBigDebris(mode) {
     const pos = this.root.position;
-    const fwd = this.getForward();
+    const fwd = this.getForward(_tmpFwd);
     const baseSpeed = this._crash ? this._crash.speed : this.cruise;
     // 大块零件 6-10（全部着火下落）
     const nLarge = 6 + Math.floor(Math.random() * 5);
@@ -555,7 +559,7 @@ export class HeavyBomber extends Enemy {
 
   _spawnSmallDebris(n, spread, withTrail) {
     const pos = this.root.position;
-    const fwd = this.getForward();
+    const fwd = this.getForward(_tmpFwd);
     const baseSpeed = this._crash ? this._crash.speed : this.cruise;
     for (let i = 0; i < n; i++) {
       this._spawnDebrisPiece(pos, fwd, baseSpeed, false, withTrail ? 4 : 0, spread);
@@ -817,10 +821,10 @@ export class HeavyBomber extends Enemy {
         // 提前量：弹丸飞行时间 × 目标速度矢量 → 预测命中点
         const tof = bestDist / (this.weapons.bulletSpeed || 650);
         this._v2.copy(best.root.position)
-          .addScaledVector(best.getVelocity ? best.getVelocity() : this._v3.set(0, 0, 0), tof);
+          .addScaledVector(best.getVelocity ? best.getVelocity(_tmpVel) : this._v3.set(0, 0, 0), tof);
         for (const idx of t.muzzles) {
-          const wp = this.getMuzzleWorldPositions()[idx];
-          this._v3.copy(this._v2).sub(wp).normalize().applyQuaternion(this._qInv);
+          this.getMuzzleWorldPosition(idx, _tmpMuzzlePos);
+          this._v3.copy(this._v2).sub(_tmpMuzzlePos).normalize().applyQuaternion(this._qInv);
           const spread = THREE.MathUtils.degToRad(t.spreadDeg ?? 1.5) * (0.5 + bestDist / t.range);
           this._v3.x += (Math.random() - 0.5) * spread;
           this._v3.y += (Math.random() - 0.5) * spread;

@@ -5,7 +5,7 @@ import { BasePage } from './_base.js';
  * 自由模式已开放，机库暂不开放。
  * 背景图复用封面图（mb1/mb2 随机切换）。
  */
-const MENU_BG = ['/img/mb1.png', '/img/mb2.png'];
+const MENU_BG = ['/img/mb1.webp', '/img/mb2.webp'];
 export class MenuPage extends BasePage {
   get name() { return 'menu'; }
 
