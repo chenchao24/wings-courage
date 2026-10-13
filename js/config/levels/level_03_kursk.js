@@ -363,7 +363,8 @@ export default {
   // 开场剧情：玩家编队（长机+玩家）+ 3 批斯图卡编队交汇
   //
   // 玩家：从 (2002, 2200, -16624) 朝 +Z 飞，速度 90
-  //   z(t) = -16624 + 90t，到可操控点 z=-8254 需 93s
+  //   z(t) = -16624 + 90t，到可操控点 z=-11254 需 ~60s
+  //   （#87：原 z=-8254/93s，斯图卡致敬后 ~45s 空窗太长；接敌点南移 3km 压缩到 ~11s）
   //
   // 长机（冯·莱纳）：跟随玩家左前方，拉远靠前方便玩家一眼看到
   //   followOffset: { x:-65, y:12, z:-95 }（左=-X, 前=-Z，距离≈115m）
@@ -380,9 +381,9 @@ export default {
     enabled: true,
     showRotateHint: true,         // 剧情阶段屏幕上方提示"鼠标右键可旋转视角"
     autoSwitchSec: 5,             // 开场 5s 后自动从座舱切到第三方视角（默认 15s）
-    triggerZ: -8254,       // 玩家朝 +Z 飞到 z=-8254（可操控开始点）触发接敌
+    triggerZ: -11254,      // 玩家朝 +Z 飞到 z=-11254（可操控开始点）触发接敌
     triggerDir: 'pos',     // 玩家朝 +Z 飞（z 增大），z >= triggerZ 时触发（默认 'neg' 朝 -Z 飞）
-    skipToZ: -8400,       // 跳过剧情后切到 z=-8400（略靠南，z < triggerZ）
+    skipToZ: -11400,       // 跳过剧情后切到 z=-11400（略靠南，z < triggerZ）
     wingmanImmediateEngage: true,  // 僚机恢复控制后立即脱离跟随（第3关专属；第1关走原逻辑等距敌<1000m）
     camAuto: { height: 11, lookAhead: 12 },  // 第三方环视相机：抬高俯瞰 + 看前方（第1关不配=默认height5/lookAhead0）
     timeline: [
@@ -488,7 +489,8 @@ export default {
   // 波次：3 波 6 架（2+2+2），苏方主力 Yak-9 / Yak-7
   // 库尔斯克苏方空军主力：Yak-9（1943 服役）、Yak-7、La-5FN
   // 倾向高空作战：第一波 2300m，后续波次 1800-2200m
-  // 出生距离 7000m（玩家前方），保持编队缓慢靠近，玩家进入 1200m 触发散开接战。
+  // 出生距离：首波 4000m（#87 提前遭遇，压缩开场空窗），后续波 7000m（玩家前方），
+  // 保持编队缓慢靠近，玩家进入 1200m 触发散开接战。
   // aiOverride：
   //   - breakDist 1200：远距离出生需更早散开（默认 500m 太近，7km 接近耗时久）
   //   - patrolAltMin/Max 拉高到 1800-2300：匹配高空出生高度，避免 think() 高度上限
@@ -499,7 +501,7 @@ export default {
   waves: [
     {
       formation: 'pair', count: 2, label: '北方双机编队', model: '/model/yak9.glb',
-      spawnAlt: [2300, 2300], spawnDist: 7000,
+      spawnAlt: [2300, 2300], spawnDist: 4000,
       aiOverride: { breakDist: 1200, patrolAltMin: 2000, patrolAltMax: 2300, aglFloor: 300 },
     },
     {
@@ -556,9 +558,9 @@ export default {
         { speaker: '博克上士', role: '僚机·你', text: '长机！你还好吗？！', duration: 3000, avatar: 'player' },
         { speaker: '冯·莱纳', role: '长机·上尉', text: '游隼2，我没事。油压在掉，需要立刻返航。', duration: 5000, avatar: 'commander' },
         { speaker: '上士', role: '僚机·你', text: '收到，游隼2，继续执行肃清任务', duration: 3000, avatar: 'player' },
-        { speaker: '冯·莱纳', role: '长机·上尉', text: '注意is2的装甲，别靠太近，保持速度和高度，保重', duration: 6000, avatar: 'commander' },
+        { speaker: '冯·莱纳', role: '长机·上尉', text: '注意伊尔-2的装甲，别靠太近，保持速度和高度，保重', duration: 6000, avatar: 'commander' },
         { speaker: '地面指挥', role: '装甲矛头指挥', text: '地面前哨报告！有编队伊尔-2出现，目前威胁地面坦克部队', duration: 6500, avatar: 'tower' },
-        { speaker: '地面指挥', role: '装甲矛头指挥', text: '游隼2，请尽快志愿', duration: 5500, avatar: 'tower' },
+        { speaker: '地面指挥', role: '装甲矛头指挥', text: '游隼2，请尽快支援', duration: 5500, avatar: 'tower' },
         { speaker: '博克上士', role: '僚机·你', text: '游隼2，收到', duration: 5500, avatar: 'player' },
       ],
     ],
@@ -575,7 +577,7 @@ export default {
     onEnemyKilledWave3: [
       { speaker: '地面指挥', role: '装甲矛头指挥', text: '一架伊尔-2坠落！装甲部队谢谢你了！', avatar: 'tower' },
       { speaker: '地面指挥', role: '装甲矛头指挥', text: '又一架！保持，他们撑不了多久了！', avatar: 'tower' },
-      { speaker: '地面指挥', role: '装甲矛头指挥', text: '击落is2报告', avatar: 'tower' },
+      { speaker: '地面指挥', role: '装甲矛头指挥', text: '击落伊尔-2报告', avatar: 'tower' },
     ],
     onPlayerDamaged: { speaker: '冯·莱纳', role: '长机·上尉', text: '注意损伤，别硬撑，机动规避！', avatar: 'commander' },
     onAllClear: { speaker: '冯·莱纳', role: '长机·上尉', text: '空域清除！装甲矛头继续推进！', avatar: 'commander' },

@@ -4,6 +4,7 @@
 测试用 ESC 跳过剧情（skipToZ=11000 + skipStartDelay(0)）立即触发刷敌。
 """
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from playwright.async_api import async_playwright
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-URL = "http://127.0.0.1:5173/index.html"
+URL = f"http://127.0.0.1:{os.environ.get('TEST_PORT', '5173')}/index.html"
 SCREENSHOTS_DIR = ROOT / "test_shots"
 SCREENSHOTS_DIR.mkdir(exist_ok=True)
 

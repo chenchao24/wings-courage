@@ -17,6 +17,13 @@
 
 ## 2026-10-13
 
+### #87 库尔斯克关卡修正（IL-2 战果计数 + 开场节奏 + 文本）
+- **IL-2 逃跑误计击落修复**：IL-2 击落目标（killTarget=4）与击落喊话只计玩家亲手击落——命中检测致死时置 `_killedByPlayer` 标记（GameRuntime），WaveDirector 的 IL-2 坠毁补计/波次释放路径对无标记者静默跳过；此前逃跑/自毁坠地的 IL-2 会推高 `_il2Killed` 导致"杀 1 跑 3 也胜利"。战斗机波次"坠毁计战果"行为不变
+- **开场剧情压缩**：接敌点 triggerZ -8254 → -11254（skipToZ 同步 -11400），斯图卡致敬后的空窗 ~45s → ~11s，开场总长 93s → ~60s
+- **首波提前遭遇**：第 1 波 Yak-9 出生距离 7000 → 4000m
+- **文本**：'请尽快志愿'→'请尽快支援'；对话内 is2 统一为 伊尔-2（×2）
+- **测试基建**：8 个 test_*.py 支持 `TEST_PORT` 环境变量（默认 5173 不变）
+
 ### #86 库尔斯克战场地面物件移除（性能）
 - 实战高度（IL-2 400-600m、战斗机 2300-3600m）下地面物件不可见（#79 思路的彻底完成版）：程序化 T-34 ×174、88mm 炮阵地 ×130、37mm 高炮 ×10、炮位/坦克士兵 InstancedMesh、死代码 GLTF 管线（model/ground_optimized/ 从未存在）全部删除
 - `js/kurskBattlefield.js` 1620→~140 行，瘦身为纯数据模块：只按 flak 配置计算防空炮位 `aaGunPositions`（37 门，rear/battlefield zones，采样逻辑不变），供 AntiAircraftFlak 发射曳光/爆点；`group/update/dispose` 接口保留

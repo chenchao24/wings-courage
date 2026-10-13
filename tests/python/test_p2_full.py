@@ -9,7 +9,7 @@ with sync_playwright() as p:
     page.on("console", lambda msg: all_logs.append(f"[{msg.type}] {msg.text}"))
     page.on("pageerror", lambda exc: errors.append(f"[PAGEERROR] {exc}"))
 
-    page.goto("http://127.0.0.1:5173", wait_until="networkidle", timeout=30000)
+    page.goto(f"http://127.0.0.1:{os.environ.get('TEST_PORT', '5173')}", wait_until="networkidle", timeout=30000)
     page.wait_for_timeout(1500)
 
     # 进入游戏

@@ -5,14 +5,15 @@
 4. 桨叶半透明 opacity=0.6
 5. update 后 _propPivot.rotation.z 增加（旋转生效）
 """
-import asyncio, sys
+import asyncio
+import os, sys
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from playwright.async_api import async_playwright
 
-URL = "http://127.0.0.1:5173/index.html"
+URL = f"http://127.0.0.1:{os.environ.get('TEST_PORT', '5173')}/index.html"
 SHOTS = ROOT / "test_shots"
 SHOTS.mkdir(exist_ok=True)
 

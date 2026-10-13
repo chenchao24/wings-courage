@@ -1319,7 +1319,7 @@ export class GameRuntime {
           if (!wasSmoking && !en.crashed && en.hp <= en.smokeThreshold) {
             this.waveDirector.notifySmoking(en);
           }
-          if (dead) this.waveDirector.notifyKilled(en);
+          if (dead) { en._killedByPlayer = true; this.waveDirector.notifyKilled(en); }
           break;
         }
       }

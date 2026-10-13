@@ -1,14 +1,15 @@
 """扫描 spitfire.glb 节点列表 + 预测螺旋桨节点（机头方向最前 mesh）
 帮助用户在调试页面快速找到螺旋桨节点
 """
-import asyncio, sys
+import asyncio
+import os, sys
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from playwright.async_api import async_playwright
 
-URL = "http://127.0.0.1:5173/tune_yak_models.html"
+URL = f"http://127.0.0.1:{os.environ.get('TEST_PORT', '5173')}/tune_yak_models.html"
 
 
 async def main():

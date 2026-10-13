@@ -344,9 +344,15 @@ export class WaveDirector {
     if (this._counted.has(enemy)) return;
     this._counted.add(enemy);
     this.killed++;
-    // IL-2 单独计数
-    if (enemy._il2State) this._il2Killed++;
+    // IL-2 击落目标（killTarget）只计玩家亲手击落（_killedByPlayer 由命中检测置位）；
+    // 自毁/逃跑坠地的 IL-2 只记 total killed 进度，不推进 killTarget（#87 修复逃跑误计胜利）
+    if (enemy._il2State && enemy._killedByPlayer) this._il2Killed++;
     if (this.cb.onEnemyKilled) this.cb.onEnemyKilled(enemy);
+  }
+
+  /** IL-2 非玩家击落（自毁/逃跑坠地）：标记已处理但不计任何战果、不触发击落对话 */
+  _markIl2Silent(e) {
+    this._counted.add(e);
   }
 
   /**
@@ -364,8 +370,10 @@ export class WaveDirector {
       if (e._despawnRequested) continue;
 
       // 坠毁计战果：检测 _exploded 且未被计数（被击落 HP=0 已由 GameRuntime notifyKilled 计数）
+      // #87：IL-2 自毁/逃跑坠地不算战果（静默标记），只有玩家亲手击落才计数
       if (e._exploded && !this._counted.has(e)) {
-        this.notifyKilled(e);
+        if (e._il2State && !e._killedByPlayer) this._markIl2Silent(e);
+        else this.notifyKilled(e);
       }
       if (e._exploded) continue;
 
@@ -472,10 +480,14 @@ export class WaveDirector {
     for (const e of this._activeEnemies) {
       // 补计未被玩家击落但已坠毁的敌机（AI 撞地/失控等），
       // 计入任务完成度但不触发 onEnemyKilled（非玩家击落，无"击落敌机"对话）
+      // #87：IL-2 例外——非玩家击落不计任何战果（不推高 killed/_il2Killed）
       if (!this._counted.has(e) && e._exploded) {
-        this._counted.add(e);
-        this.killed++;
-        if (e._il2State) this._il2Killed++;
+        if (e._il2State) {
+          this._markIl2Silent(e);
+        } else {
+          this._counted.add(e);
+          this.killed++;
+        }
       }
       this._smokingNotified.delete(e);
       if (this.cb.disposeEnemy) this.cb.disposeEnemy(e);

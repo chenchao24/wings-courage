@@ -4,6 +4,7 @@
 - 模型机头应朝向 -Z（与 forward 箭头方向一致）
 """
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -12,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from playwright.async_api import async_playwright
 
-URL = "http://127.0.0.1:5173/tune_yak_models.html"
+URL = f"http://127.0.0.1:{os.environ.get('TEST_PORT', '5173')}/tune_yak_models.html"
 
 
 async def main():

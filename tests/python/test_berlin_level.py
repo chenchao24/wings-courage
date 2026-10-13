@@ -4,6 +4,7 @@
      → 沙盒模式（无 waves 不弹胜利结算）
 """
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -14,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 from playwright.async_api import async_playwright
 
-URL = "http://127.0.0.1:5173/index.html"
+URL = f"http://127.0.0.1:{os.environ.get('TEST_PORT', '5173')}/index.html"
 SCREENSHOTS_DIR = ROOT / "test_shots"
 SCREENSHOTS_DIR.mkdir(exist_ok=True)
 
