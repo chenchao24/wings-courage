@@ -253,11 +253,12 @@ export function createEnvironment(scene, renderer, envConfig = null) {
   scene.fog = new THREE.FogExp2(fogColor, fogDensity);
 
   // ---------- 地形 ----------
-  // 关卡隔离：theme 'berlin' 用 BerlinGround（纯平卫星贴图地面，高空关卡无地面3D内容），
-  // 不创建 Terrain/Buildings；其他主题走原路径，逐行不变。
-  const isBerlin = cfg.theme === 'berlin';
+  // 关卡隔离：theme 'berlin' 或 ground.type 'satellite' 用 BerlinGround
+  // （纯平卫星贴图地面，无地面3D内容），不创建 Terrain/Buildings；
+  // 其他主题走原路径，逐行不变。
+  const useSatelliteGround = cfg.theme === 'berlin' || cfg.ground?.type === 'satellite';
   let terrain, ground, buildings = null, obstacles = [], obstacleCenters = [];
-  if (isBerlin) {
+  if (useSatelliteGround) {
     const maxAniso = renderer?.capabilities?.getMaxAnisotropy?.() ?? 4;
     terrain = new BerlinGround({ anisotropy: Math.min(8, maxAniso), ...(cfg.ground || {}) });
     ground = terrain.create();

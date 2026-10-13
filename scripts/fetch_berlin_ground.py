@@ -3,11 +3,11 @@
 fetch_berlin_ground.py — 第四关《柏林保卫战》地面卫星贴图一次性获取管线
 
 数据源：Sentinel-2 L2A（哥白尼开放数据，AWS 公开桶 sentinel-s2-l2a，匿名 HTTP 可取）
-输出：img/berlin/ground.jpg（8000x4800，1 texel = 10m，覆盖 80km x 48km）
+输出：img/berlin/ground.jpg（8000x6400，1 texel = 10m，覆盖 80km x 64km）
       img/berlin/ground_preview.jpg（快速检查用）
 
 裁剪窗口（UTM 33N，单位米）：
-  E 300000 ~ 380000（西→东 80km），N 5800020 ~ 5848020（南→北 48km）
+  E 300000 ~ 380000（西→东 80km），N 5792020 ~ 5856020（南→北 64km）
   窗口东缘切入柏林城西半（E~370000 起为市区），城市贴图落在地图东缘。
   窗口完全位于 Sentinel-2 tile 33UUU 范围内，无需拼图。
 

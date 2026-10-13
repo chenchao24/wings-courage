@@ -92,6 +92,30 @@ async def test_level(p, level_id):
     print(" ", info)
     check(f"{level_id} 无 BerlinGround 泄漏", info.get("terrainIsBerlin") is False)
     check(f"{level_id} 无高度规则泄漏", info.get("noAltRule") is True)
+
+    # #85 巴巴罗萨卫星地面重构专项断言
+    if level_id == "barbarossa":
+        sat = await page.evaluate("""
+            () => {
+                const g = window.__shell.scene.getObjectByName('barbarossaGround');
+                const tex = g && g.material && g.material.map;
+                return {
+                    exists: !!g,
+                    skirt: !!window.__shell.scene.getObjectByName('barbarossaGroundSkirt'),
+                    texLoaded: !!(tex && tex.image && tex.image.width),
+                    hasOldTerrain: !!window.__shell.scene.getObjectByName('terrain'),
+                    buildings: !!window.__shell.env.buildings,
+                    playerAlt: Math.round(window.__shell.runtime.player.root.position.y),
+                };
+            }
+        """)
+        print("  卫星地面:", sat)
+        check("barbarossa 卫星地面存在", sat.get("exists") is True)
+        check("barbarossa 裙边存在", sat.get("skirt") is True)
+        check("barbarossa 贴图已加载", sat.get("texLoaded") is True)
+        check("barbarossa 无旧 Terrain/Buildings", sat.get("hasOldTerrain") is False and sat.get("buildings") is False)
+        check("barbarossa 玩家出生≈1800m", abs((sat.get("playerAlt") or 0) - 1800) < 250)
+
     await page.screenshot(path=str(SCREENSHOTS_DIR / f"regress_{level_id}.png"))
     await browser.close()
 

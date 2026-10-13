@@ -305,11 +305,11 @@ async def main():
             print("❌ 巴巴罗萨不应有海洋"); ok = False
         else: print("✓ 巴巴罗萨无海洋")
 
-        # 玩家初始位置应回到巴巴罗萨出生点 ≈(0, 1500, 0)
+        # 玩家初始位置应回到巴巴罗萨出生点 ≈(0, 1800, 0)（#85 重构后显式配置）
         if bar.get("playerPos"):
             bp = bar["playerPos"]
-            if abs(bp[0]) > 200 or abs(bp[2]) > 200 or abs(bp[1] - 1500) > 150:
-                print(f"❌ 巴巴罗萨玩家位置错误: {bp} (期望 ≈[0, 1500, 0]，允许 ±200)"); ok = False
+            if abs(bp[0]) > 200 or abs(bp[2]) > 200 or abs(bp[1] - 1800) > 200:
+                print(f"❌ 巴巴罗萨玩家位置错误: {bp} (期望 ≈[0, 1800, 0]，允许 ±200)"); ok = False
             else: print(f"✓ 巴巴罗萨玩家位置合理: {bp}")
 
         await page.screenshot(path=str(SCREENSHOTS_DIR / "britain_v2_05_barbarossa.png"))

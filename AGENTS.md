@@ -36,6 +36,7 @@ _archive/             # 本地归档（改前备份、一次性脚本；已被 .
 
 ## 版本
 - 当前：0.72.8.20
+- 2026-10-13 巴巴罗萨地图卫星化重构（CHANGELOG #85）：第 2 关地面改用 BerlinGround 卫星贴图（`ground.type:'satellite'` 门控，`img/barbarossa/ground.jpg` 40×32km 10m/px，管线 `scripts/fetch_barbarossa_ground.py`）；玩家 1800m/敌机 1400-1800m/spawnDist 3000/patrolAlt 800-1400；旧程序化地形保留为主菜单背景与缺省回退，勿删 terrain.js/buildings.js 缺省逻辑
 - 2026-10-12 上线前优化（CHANGELOG #84）：全部在役 GLB 已 meshopt 压缩（me_262/fw190 含 webp 纹理）；**重跑 `scripts/optimize_b17.mjs`/`optimize_p51.mjs` 会重新生成未压缩 glb，必须补跑 `npx gltf-transform meshopt`**；调试全局仅 localhost/?debug 挂载；调参工具页在 `tools/`（依赖 /node_modules，不进部署）
 - 自由模式框架搭建中；Me 262 已加入自由模式可选机型（#82，武器伤害 ×0.75）
 - 第 4 关《柏林保卫战》P1 已落地（2026-08-16 ~ 08-17，详见 docs/CHANGELOG.md #58-#62）：

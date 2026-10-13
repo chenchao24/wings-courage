@@ -15,6 +15,17 @@
 - **测试**：test_britain_level.py 现代化（ESC 跳过剧情过场后验证敌机生成，修 GBK 编码与平海面顶点断言）；全量回归绿：campaign 三关 + berlin + britain
 - **注意**：重跑 `scripts/optimize_b17.mjs`/`optimize_p51.mjs` 会重新生成未压缩 glb，需补跑 meshopt
 
+## 2026-10-13
+
+### #85 巴巴罗萨地图卫星化重构 + 交战高度/距离/云重配
+- **地图**：第 2 关地面从程序化地形（terrain.js 缺省模式：18km 顶点色农田 + ~400 个随机村庄 mesh + 2100 棵松树）换成柏林方案卫星贴图——Sentinel-2 真彩色（**明斯克以西平原 40×32km**，2023-06-05 初夏影像，原生 10m/px，2.7MB）。新增管线 `scripts/fetch_barbarossa_ground.py`（R60m 快视图实测窗口覆盖率，规避 tileInfo 虚报）
+- **泛化**（共享文件缺省兼容）：`js/berlinGround.js` 裙边兜底色/404 色/mesh 名参数化（柏林默认值不变）；`js/environment.js` 地形分支改为 `theme==='berlin' || ground.type==='satellite'` 门控（其他关零影响）。旧地形/建筑代码保留——主菜单背景仍用它，删关卡 ground 字段即回退
+- **出生与距离**：玩家出生 1500（aircraft.reset 硬编码缺省）→ 显式 `playerStart` 1800m；敌机出生 1000-1200 → 1400-1800m；出生距离 1400-1900 → `spawnDist 3000`；每波 `aiOverride patrolAlt 800-1400`（原 fighter 缺省 400-1000 会压到贴地，卫星图低空观感弱）
+- **云**：云带随图幅/高度层重配（y 1200-1400 → 1300-1700，x±6km→±15km，z 纵深 1500→-7000 扩为 3000→-18000）；spacing 700→1300 抵消面积放大，sprite 总量与 #83 持平；自由模式副本同步并补上 #83 云配置漂移
+- **性能**：draw call ~800 → 135（村庄/森林/地形网格全移除，剩 2 个地面 draw call）
+- **自由模式**：`FreeModeMaps.js` 巴巴罗萨副本手动同步同款地面（铁原则：不改战役文件，不 import）
+- **回归**：campaign 三关（含新增巴巴罗萨卫星地面断言）+ berlin + britain 全绿；britain 测试里巴巴罗萨出生断言同步 1800m
+
 ## 2026-07-31
 
 ### #1 基础飞行测试场

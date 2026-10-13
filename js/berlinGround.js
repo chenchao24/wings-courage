@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 
 /**
- * 柏林地面（仅第四关《柏林保卫战》，theme 'berlin' 时由 environment.js 创建）。
+ * 卫星贴图地面（通用）：纯平平面 + Sentinel-2 卫星真彩色贴图 + 视觉裙边。
+ * 使用方：第四关柏林（theme 'berlin'）、第二关巴巴罗萨（ground.type 'satellite'），
+ * 由 environment.js 按配置创建。
  *
- * 设计：交战高度锁死 3000-7000m（低于 2000m 触发 CombatAltRule），玩家距地面
- * 永远 ≥2000m，故地面不做任何 3D 内容——纯平平面 + Sentinel-2 卫星真彩色贴图
- * （10m/px，scripts/fetch_berlin_ground.py 产出 img/berlin/ground.jpg）。
- * 图幅 80×64km；B-17 走廊把战场推到图幅边缘（机群出生 x=+38km，距东缘仅 2km，
- * 12km 处雾仅遮 ~76%），故加视觉裙边三件套：
+ * 设计前提：关卡交战高度较高（贴图分辨率有限，低空会糊）。柏林用 CombatAltRule
+ * 锁死 ≥2000m；巴巴罗萨用 40×32km 小图幅保住原生 10m/px 缓解低空观感。
+ * 图幅 80×64km（柏林）/ 40×32km（巴巴罗萨）；B-17 走廊把战场推到图幅边缘
+ * （机群出生 x=+38km，距东缘仅 2km，12km 处雾仅遮 ~76%），故加视觉裙边三件套：
  *   ① 环形裙边大平面（外框 4 倍图幅 − 主图内孔，与主平面零重叠，根除垫层 z-fight）；
- *   ② 裙边贴图 = 主图降采样 2048px（~39m/px，镜像平铺与主图逐边对齐）；
+ *   ② 裙边贴图 = 主图降采样 2048px（镜像平铺与主图逐边对齐）；
  *   ③ 主图最外 2km 环带羽化模糊到裙边频率，接缝锐度平滑过渡。
  * 边界在雾中自然延伸，无硬边无频率跳变。
  *
@@ -23,11 +24,14 @@ export class BerlinGround {
     this.depth = options.depth ?? 64000;    // z 南北向（米）
     this.textureUrl = options.texture ?? '/img/berlin/ground.jpg';
     this.anisotropy = options.anisotropy ?? 4;
+    this.name = options.name ?? 'berlinGround';  // 场景标识（柏林关测试按名查找，勿改缺省）
     // 视觉裙边（隐藏图幅边界，纯视觉不扩展可玩区）
     this.skirtScale = options.skirtScale ?? 4;       // 裙边图幅 = 主图 ×4（320×256km）
     this.skirtTexSize = options.skirtTexSize ?? 2048; // 降采样宽度（px，~39m/px）
     this.skirtY = options.skirtY ?? -0.5;            // 略低于主平面，防接缝发线缝
     this.featherMeters = options.featherMeters ?? 2000; // 主图边缘羽化带（渐进模糊到裙边频率）
+    this.skirtColor = options.skirtColor ?? 0x6b6f5a;   // 裙边贴图就位前的兜底色（近似卫星图平均色调）
+    this.fallbackColor = options.fallbackColor ?? [74, 76, 70]; // 贴图 404 兜底噪点色（RGB）
 
     this.mesh = null;
     this._texture = null;
@@ -62,7 +66,7 @@ export class BerlinGround {
     });
 
     this.mesh = new THREE.Mesh(geo, mat);
-    this.mesh.name = 'berlinGround';
+    this.mesh.name = this.name;
     this.mesh.receiveShadow = true;
     this.mesh.add(this._createSkirt());
     return this.mesh;
@@ -104,13 +108,13 @@ export class BerlinGround {
     }
 
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x6b6f5a,          // 贴图就位前的兜底色（近似卫星图平均色调）
+      color: this.skirtColor,   // 贴图就位前的兜底色（近似卫星图平均色调）
       roughness: 0.96,
       metalness: 0.0,
     });
 
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.name = 'berlinGroundSkirt';
+    mesh.name = `${this.name}Skirt`;
     mesh.position.y = this.skirtY;
     this._skirt = mesh;
     return mesh;
@@ -199,7 +203,7 @@ export class BerlinGround {
   }
 
   /**
-   * 卫星贴图加载失败兜底：暗灰城市色 + 微噪点 CanvasTexture（平铺），替换主贴图。
+   * 卫星贴图加载失败兜底：微噪点 CanvasTexture（平铺），替换主贴图。
    * 裙边保持 _createSkirt 的兜底色不变；成功路径（羽化/裙边贴图）任何行为不动。
    */
   _applyFallbackTexture() {
@@ -208,11 +212,12 @@ export class BerlinGround {
     c.width = c.height = S;
     const ctx = c.getContext('2d');
     const img = ctx.createImageData(S, S);
+    const [fr, fg, fb] = this.fallbackColor;
     for (let i = 0; i < img.data.length; i += 4) {
       const n = (Math.random() - 0.5) * 14;     // 微噪点
-      img.data[i] = 74 + n;                     // 暗灰城市色（近似卫星图建成区均值）
-      img.data[i + 1] = 76 + n;
-      img.data[i + 2] = 70 + n;
+      img.data[i] = fr + n;
+      img.data[i + 1] = fg + n;
+      img.data[i + 2] = fb + n;
       img.data[i + 3] = 255;
     }
     ctx.putImageData(img, 0, 0);

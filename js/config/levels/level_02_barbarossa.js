@@ -58,10 +58,23 @@ export default {
     },
   },
 
-  // 关卡环境：巴巴罗萨东线主题（显式 theme 标识触发环境重建，其余参数走 environment.js 默认）
-  // sky 天空/太阳/雾/光照均沿用默认（蓝天下 42° 太阳），仅定制天边云
+  // 关卡环境：东线夏季清晨 + 卫星贴图地面（#85 重构）
+  // 地面：Sentinel-2 真彩色（明斯克以西平原 40×32km，原生 10m/px，scripts/fetch_barbarossa_ground.py 产出）
+  // 天空/太阳/雾/光照沿用巴巴罗萨默认（夏季清晨蓝天，hemiGround 绿色恰好匹配卫星图色调）
   environment: {
     theme: 'barbarossa',
+
+    // 卫星地面（BerlinGround 通用类）：纯平 + 视觉裙边，无 Terrain/Buildings
+    // 不设高度锁：教学关保留自由低空狗斗与触地判定（getHeight 恒 0）
+    ground: {
+      type: 'satellite',
+      texture: '/img/barbarossa/ground.jpg',
+      width: 40000,
+      depth: 32000,
+      name: 'barbarossaGround',
+      skirtColor: 0x484f35,          // 卫星图平均色调（农田+林地混合）
+      fallbackColor: [73, 80, 53],
+    },
 
     // 远景天边云：天空球内三层 fbm 噪声云（远景层云/中空层积云/高空卷云，零 draw call）
     // 风格对比不列颠海峡阴云：东线 1941.06.22 夏季清晨，晴朗少云、云色更亮更白
@@ -75,13 +88,15 @@ export default {
     },
   },
 
-  // 中空云团（性能优化版：云量 -90%，patchiness 块状分布 + distFade 距离剔除）
-  // 玩家出生 (0,700,0) 朝 -Z 飞，敌机在 z=-1400~-1900 出生 → 云带覆盖战斗区+前飞路径
+  // 中空云团（性能优化版：patchiness 块状分布 + distFade 距离剔除）
+  // #85：随卫星图幅（40×32km）与交战高度层（800-1800m）重配——云带 y 1300-1700 横穿交战层，
+  // 横向/纵深放宽覆盖主战场；spacing 700→1300 抵消面积放大，sprite 总量与旧版同级
+  // 玩家出生 (0,1800,0) 朝 -Z 飞，敌机在前方 3000m 出生 → 云带覆盖战斗区+前飞路径
   clouds: {
     mode: 'fixed',
-    bandBox: [-6000, 6000, 1200, 1400, 1500, -7000],  // x±6000 横向，y 1200-1400，z 1500→-7000 纵深
-    spacing: 700,              // 500→700：网格变疏（24×17=408 → 17×12=204 格）
-    patchiness: 0.82,          // 块状分布：跳过 82% 低值格子 → ~37 云团（大片晴空+少量云系）
+    bandBox: [-15000, 15000, 1300, 1700, 3000, -18000],  // x±15km 横向，y 1300-1700，z 3000→-18000 纵深
+    spacing: 1300,             // 700→1300：面积放大 ~6 倍后保持云团总数同级（~65 团）
+    patchiness: 0.82,          // 块状分布：跳过 82% 低值格子（大片晴空+少量云系）
     patchScale: 8000,          // 噪声尺度 8km：晴空区成片出现
     blobsPerCluster: [5, 7],   // 每团 sprite 数（团内密度足，连片更厚实）
     minSize: 320,
@@ -94,8 +109,8 @@ export default {
     distFade: [3000, 5000, 7000],
     extraBands: [
       {
-        bandBox: [-6000, 6000, 1200, 1400, 1500, -7000],
-        spacing: 4000,         // 1500→4000：8×6=48 → 3×2=6 云团
+        bandBox: [-15000, 15000, 1300, 1700, 3000, -18000],
+        spacing: 6000,         // 稀疏散布层
         blobsPerCluster: [2, 3],  // 少量 sprite，小云团
         minSize: 220,
         maxSize: 420,
@@ -108,13 +123,21 @@ export default {
   // P4：6 波共 9 架（1+1+2+1+2+2）。entry 方位供 P5 无线电播报使用。
   // model 指定本波敌机模型；未指定则回退到默认 yak9.glb。
   // 难度梯度：I-153(125km/h) → I-16(130) → Yak-1(171) → Yak-7(174)，逐波提速
+  // #85：出生高度 1000-1200 → 1400-1800（玩家 1800 出生，迎头略低利于俯冲攻击教学）；
+  //       spawnDist 3000（图幅 18km→40km 后拉开交战距离，拦截窗口 ~15-20s）；
+  //       aiOverride 把 AI 巡航带提到 800-1400m（原 fighter 缺省 400-1000 会压到贴地，
+  //       卫星图 10m/px 在 800m+ 观感清晰；aglFloor 走缺省 120，触地判定照常）
+  playerStart: {
+    position: [0, 1800, 0],     // 原缺省 1500（aircraft.reset 硬编码）；显式 1800 留俯冲余量
+    speed: 90,                  // 巡航速度（库尔斯克同值）
+  },
   waves: [
-    { formation: 'solo', count: 1, entry: 'NW', label: '西北方向单机', model: '/model/i153.glb', spawnAlt: [1000, 1200] }, // 第1波（I-153 双翼战斗机）
-    { formation: 'solo', count: 1, entry: 'E',  label: '东方单机',     model: '/model/i16.glb',  spawnAlt: [1000, 1200] }, // 第2波（I-16）
-    { formation: 'pair', count: 2, entry: 'S',  label: '南方双机编队', model: '/model/i16.glb',  spawnAlt: [1000, 1200] }, // 第3波（I-16）
-    { formation: 'solo', count: 1, entry: 'W',  label: '西方单机', model: '/model/yak1.glb',     spawnAlt: [1000, 1200] }, // 第4波（Yak-1）
-    { formation: 'pair', count: 2, entry: 'N',  label: '北方双机编队', model: '/model/yak1.glb', spawnAlt: [1000, 1200] }, // 第5波（Yak-1）
-    { formation: 'pair', count: 2, entry: 'SE', label: '东南双机编队', model: '/model/yak7.glb', spawnAlt: [1000, 1200] }, // 第6波（Yak-7）
+    { formation: 'solo', count: 1, entry: 'NW', label: '西北方向单机', model: '/model/i153.glb', spawnAlt: [1400, 1800], spawnDist: 3000, aiOverride: { patrolAltMin: 800, patrolAltMax: 1400 } }, // 第1波（I-153 双翼战斗机）
+    { formation: 'solo', count: 1, entry: 'E',  label: '东方单机',     model: '/model/i16.glb',  spawnAlt: [1400, 1800], spawnDist: 3000, aiOverride: { patrolAltMin: 800, patrolAltMax: 1400 } }, // 第2波（I-16）
+    { formation: 'pair', count: 2, entry: 'S',  label: '南方双机编队', model: '/model/i16.glb',  spawnAlt: [1400, 1800], spawnDist: 3000, aiOverride: { patrolAltMin: 800, patrolAltMax: 1400 } }, // 第3波（I-16）
+    { formation: 'solo', count: 1, entry: 'W',  label: '西方单机', model: '/model/yak1.glb',     spawnAlt: [1400, 1800], spawnDist: 3000, aiOverride: { patrolAltMin: 800, patrolAltMax: 1400 } }, // 第4波（Yak-1）
+    { formation: 'pair', count: 2, entry: 'N',  label: '北方双机编队', model: '/model/yak1.glb', spawnAlt: [1400, 1800], spawnDist: 3000, aiOverride: { patrolAltMin: 800, patrolAltMax: 1400 } }, // 第5波（Yak-1）
+    { formation: 'pair', count: 2, entry: 'SE', label: '东南双机编队', model: '/model/yak7.glb', spawnAlt: [1400, 1800], spawnDist: 3000, aiOverride: { patrolAltMin: 800, patrolAltMax: 1400 } }, // 第6波（Yak-7）
   ],
 
   // P5：对话脚本（事件触发，由 GameRuntime 调 DialogSystem.show）

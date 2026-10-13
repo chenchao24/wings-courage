@@ -424,7 +424,7 @@ export default {
     },
 
     // 柏林地面（BerlinGround）：Sentinel-2 卫星贴图，80000×64000（宽高比 1.25，近方形观感）
-    ground: { width: 80000, depth: 64000 },
+    ground: { type: 'satellite', width: 80000, depth: 64000 },
 
     // 防空火力 Flak —— 我方柏林防空军，目标=轰炸机编队，不打玩家（纯表演）
     // corridor 走廊模式（AntiAircraftFlak 缺省不配置=其他关"跟随玩家"行为不变）：
