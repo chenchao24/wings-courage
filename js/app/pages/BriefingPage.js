@@ -35,6 +35,6 @@ export class BriefingPage extends BasePage {
       this.shell.ensureAudio();
       this.shell.startLevel(params.levelId);
     });
-    this._onClick('[data-action="back"]', () => this.router.back());
+    this._onClick('[data-action="back"]', () => this.router.go('level-select'));
   }
 }

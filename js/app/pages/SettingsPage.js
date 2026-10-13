@@ -117,7 +117,7 @@ export class SettingsPage extends BasePage {
       });
     });
 
-    this._onClick('[data-action="back"]', () => this.router.back());
+    this._onClick('[data-action="back"]', () => this.router.go('menu'));
   }
 
   _onUnmount() {

@@ -65,7 +65,7 @@ export class LevelSelectPage extends BasePage {
         this.router.go('briefing', { levelId: id });
       });
     });
-    this._onClick('[data-action="back"]', () => this.router.back());
+    this._onClick('[data-action="back"]', () => this.router.go('menu'));
   }
 
   _toast(msg) {

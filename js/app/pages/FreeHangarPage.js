@@ -117,7 +117,7 @@ export class FreeHangarPage extends BasePage {
     this._onClick('[data-action="prev"]', () => this._cyclePlayer(-1));
     this._onClick('[data-action="next"]', () => this._cyclePlayer(1));
     this._onClick('[data-action="start"]', () => this._start());
-    this._onClick('[data-action="back"]', () => this.router.back());
+    this._onClick('[data-action="back"]', () => this.router.go('free-map-select'));
 
     this._initPreview();
     this._loadPreview(this._state.playerAircraftId);

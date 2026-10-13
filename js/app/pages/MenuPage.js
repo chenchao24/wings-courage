@@ -45,7 +45,7 @@ export class MenuPage extends BasePage {
     this._onClick('[data-action="settings"]', () => this.router.go('settings'));
     this._onClick('[data-action="hangar"]', () => this._toast('机库尚未开放'));
     this._onClick('[data-action="free"]', () => this.router.go('free-map-select'));
-    this._onClick('[data-action="back"]', () => this.router.back());
+    this._onClick('[data-action="back"]', () => this.router.go('cover'));
   }
 
   _toast(msg) {

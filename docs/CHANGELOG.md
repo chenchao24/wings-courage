@@ -17,6 +17,11 @@
 
 ## 2026-10-13
 
+### #88 页面返回导航修复
+- 问题：各页"返回"按钮走 Router 历史栈 `back()`，历史栈混入简报页等中间页后，选关页"返回菜单"会先弹回简报页（任务开始页），需多次点击才能回菜单
+- 修复：六个页面的返回按钮全部改为显式目标导航（BriefingPage→选关、LevelSelectPage/SettingsPage/FreeMapSelectPage→菜单、FreeHangarPage→自由选图、MenuPage→封面），不再依赖历史栈
+- 验证： playwright 探针覆盖"进关→ESC 暂停→返回主菜单→返回菜单"场景，一次点击直达
+
 ### #87 库尔斯克关卡修正（IL-2 战果计数 + 开场节奏 + 文本）
 - **IL-2 逃跑误计击落修复**：IL-2 击落目标（killTarget=4）与击落喊话只计玩家亲手击落——命中检测致死时置 `_killedByPlayer` 标记（GameRuntime），WaveDirector 的 IL-2 坠毁补计/波次释放路径对无标记者静默跳过；此前逃跑/自毁坠地的 IL-2 会推高 `_il2Killed` 导致"杀 1 跑 3 也胜利"。战斗机波次"坠毁计战果"行为不变
 - **开场剧情压缩**：接敌点 triggerZ -8254 → -11254（skipToZ 同步 -11400），斯图卡致敬后的空窗 ~45s → ~11s，开场总长 93s → ~60s

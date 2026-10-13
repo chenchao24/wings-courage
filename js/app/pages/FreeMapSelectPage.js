@@ -57,7 +57,7 @@ export class FreeMapSelectPage extends BasePage {
         this.router.go('free-hangar', { mapId: id });
       });
     });
-    this._onClick('[data-action="back"]', () => this.router.back());
+    this._onClick('[data-action="back"]', () => this.router.go('menu'));
   }
 
   _toast(msg) {
