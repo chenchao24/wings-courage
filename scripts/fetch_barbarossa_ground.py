@@ -29,31 +29,25 @@ TMP = os.path.join(ROOT, 'scripts', '_ground_cache')
 BUCKET = 'https://sentinel-s2-l2a.s3.eu-central-1.amazonaws.com'
 TILE = ('35', 'U', 'MV')
 
-# 候选拍摄日期（5-8 月夏季植被；2023-06 中旬优先——巴巴罗萨行动 6.22 的初夏观感）。
-# 注意：本 tile 的 tileInfo dataCoveragePercentage 不可靠（2024-06-09 声称 100% 实际仅 ~4%），
-# 因此 find_tile() 在下载大文件前用 R60m/TCI.jp2（1830px 快视图）实测窗口有效像素比例。
+# 候选拍摄日期（5-8 月夏季植被；2023-06-18 优先——6.22 前初夏且窗口实测 0.00% 云斑）。
+# 注意：本 tile 的 tileInfo dataCoveragePercentage/cloudyPixelPercentage 不可靠
+# （2024-06-09 声称 100%/0% 实际仅 ~4% 有效；2023-06-05 标称 0% 云但窗口内有 0.61% 积云斑），
+# 因此 find_tile() 在下载大文件前用 R60m/TCI.jp2（1830px 快视图）实测窗口有效像素与云斑比例。
 CANDIDATES = [
+    (2023, 7, 23),
+    (2023, 7, 8),
+    (2023, 8, 2),
+    (2024, 7, 2),
     (2023, 6, 18),
-    (2023, 6, 13),
-    (2023, 6, 5),
     (2023, 6, 25),
     (2023, 7, 5),
-    (2023, 7, 8),
-    (2023, 7, 23),
-    (2023, 8, 2),
-    (2023, 8, 12),
-    (2024, 6, 26),
-    (2024, 7, 2),
-    (2024, 7, 12),
-    (2024, 8, 6),
-    (2024, 8, 28),
     (2024, 5, 2),
     (2024, 5, 17),
 ]
 
-# 质量门槛：tileInfo 云量 + R60m 快视图实测窗口有效率
-MAX_CLOUDY_PCT = 8.0
+# 质量门槛：R60m 快视图实测——窗口有效率 ≥95% 且云斑（高亮低饱和像素）≤0.5%
 MIN_WINDOW_VALID_PCT = 95.0
+MAX_WINDOW_CLOUD_PCT = 0.5
 
 # 裁剪窗口（UTM 35N，米）：40km × 32km（宽高比 1.25，与柏林一致）
 E_MIN, E_MAX = 420000, 460000    # 40 km
@@ -75,8 +69,9 @@ def http_get(url, dst=None, expect_min=0):
     return data
 
 
-def window_valid_pct(base):
-    """用 R60m 快视图（~1830px）实测目标窗口的有效像素比例（白色=no-data）。"""
+def window_stats(base):
+    """用 R60m 快视图（~1830px）实测目标窗口：(有效像素比例, 云斑比例)。
+    云斑判定：高亮度且低饱和（白/亮灰积云）。白色 no-data 同时计入无效与云斑。"""
     import io
     from PIL import Image
     data = http_get(f'{BUCKET}/{base}/R60m/TCI.jp2', expect_min=10_000)
@@ -85,12 +80,20 @@ def window_valid_pct(base):
     win = pv.crop((int((E_MIN - 399960) / 10 * sx), int((6000000 - N_MAX) / 10 * sy),
                    int((E_MAX - 399960) / 10 * sx), int((6000000 - N_MIN) / 10 * sy)))
     px = list(win.getdata())
-    ok = sum(1 for p in px if not (p[0] > 200 and p[1] > 200 and p[2] > 200))
-    return ok / len(px) * 100
+    valid = cloud = 0
+    for p in px:
+        white = p[0] > 200 and p[1] > 200 and p[2] > 200
+        if not white:
+            valid += 1
+        mx, mn = max(p), min(p)
+        if mx > 190 and (mx - mn) < 45:
+            cloud += 1
+    n = len(px)
+    return valid / n * 100, cloud / n * 100
 
 
 def find_tile():
-    """按候选日期探测 tile：tileInfo 过滤云量，R60m 快视图实测窗口覆盖率。"""
+    """按候选日期探测 tile：R60m 快视图实测窗口有效率与云斑（不信 tileInfo 自报值）。"""
     for (y, m, d) in CANDIDATES:
         for seq in (0, 1):
             base = f'tiles/{TILE[0]}/{TILE[1]}/{TILE[2]}/{y}/{m}/{d}/{seq}'
@@ -98,19 +101,15 @@ def find_tile():
                 info = json.loads(http_get(f'{BUCKET}/{base}/tileInfo.json'))
             except Exception:
                 continue
-            cld = info.get('cloudyPixelPercentage', 100)
-            if cld > MAX_CLOUDY_PCT:
-                print(f'[probe] {y}-{m:02d}-{d:02d} seq={seq}: 云 {cld:.2f}% 超门槛')
-                continue
             try:
-                wpct = window_valid_pct(base)
+                wpct, cpct = window_stats(base)
             except Exception:
                 continue
-            print(f'[probe] {y}-{m:02d}-{d:02d} seq={seq}: 云 {cld:.2f}% 窗口有效 {wpct:.0f}%')
-            if wpct >= MIN_WINDOW_VALID_PCT:
+            print(f'[probe] {y}-{m:02d}-{d:02d} seq={seq}: 窗口有效 {wpct:.0f}% 云斑 {cpct:.2f}%')
+            if wpct >= MIN_WINDOW_VALID_PCT and cpct <= MAX_WINDOW_CLOUD_PCT:
                 print(f'[ok] 采用 tile: {y}-{m:02d}-{d:02d} seq={seq}')
                 return (y, m, d, seq, base, info)
-    raise RuntimeError('所有候选日期均不满足云量/窗口覆盖率门槛')
+    raise RuntimeError('所有候选日期均不满足窗口有效率/云斑门槛')
 
 
 def main():
