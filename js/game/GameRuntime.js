@@ -1225,7 +1225,7 @@ export class GameRuntime {
     if (env.sky) env.sky.position.copy(camera.position);
     if (env.ocean) env.ocean.update(dt, camera);
     if (env.updateSkyClouds) env.updateSkyClouds(dt);
-    if (env.battlefield) env.battlefield.update(dt, this.player?.position);   // 库尔斯克战场物件（含距离剔除）
+    if (env.battlefield) env.battlefield.update(dt, this.player?.position);   // 库尔斯克战场（#86 起空转保接口）
     if (env.flak) env.flak.update(dt, this.player?.root?.position, this.ctx.camera, this.player ? this.player.getForward(_fwd) : undefined, this.ctx.audio, this.bomberStream); // 防空火力 Flak 视觉+音效（corridor 模式用机群位置）
 
     // 6.5 关卡音乐：计算最近敌机距离，驱动主题曲/战斗高潮曲切换

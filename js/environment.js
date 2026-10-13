@@ -308,8 +308,7 @@ export function createEnvironment(scene, renderer, envConfig = null) {
     scene.add(roads.group);
   }
 
-  // ---------- 库尔斯克战场氛围地标（仅 kursk 主题）----------
-  // 坦克残骸 / 燃烧烟柱 / 装甲纵队，纯视觉不可交互。
+  // ---------- 库尔斯克战场（仅 kursk 主题；#86 起为纯数据模块：只算防空炮位）----------
   // 关卡隔离：cfg.theme === 'kursk' 是唯一入口，britain/barbarossa 不创建。
   let battlefield = null;
   if (cfg.theme === 'kursk' && cfg.battlefield?.enabled) {

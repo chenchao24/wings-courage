@@ -17,6 +17,12 @@
 
 ## 2026-10-13
 
+### #86 库尔斯克战场地面物件移除（性能）
+- 实战高度（IL-2 400-600m、战斗机 2300-3600m）下地面物件不可见（#79 思路的彻底完成版）：程序化 T-34 ×174、88mm 炮阵地 ×130、37mm 高炮 ×10、炮位/坦克士兵 InstancedMesh、死代码 GLTF 管线（model/ground_optimized/ 从未存在）全部删除
+- `js/kurskBattlefield.js` 1620→~140 行，瘦身为纯数据模块：只按 flak 配置计算防空炮位 `aaGunPositions`（37 门，rear/battlefield zones，采样逻辑不变），供 AntiAircraftFlak 发射曳光/爆点；`group/update/dispose` 接口保留
+- 库尔斯克性能：drawCalls **2215 → 26**，mesh 4744 → 63，geometry 616 → 20
+- level_03 的 battlefield.zones/数量配置随之清理（死配置）；回归三关+柏林+不列颠全绿，Flak 正常
+
 ### #85 巴巴罗萨地图卫星化重构 + 交战高度/距离/云重配
 - **地图**：第 2 关地面从程序化地形（terrain.js 缺省模式：18km 顶点色农田 + ~400 个随机村庄 mesh + 2100 棵松树）换成柏林方案卫星贴图——Sentinel-2 真彩色（**明斯克以西平原 40×32km**，2023-06-05 初夏影像，原生 10m/px，2.7MB）。新增管线 `scripts/fetch_barbarossa_ground.py`（R60m 快视图实测窗口覆盖率，规避 tileInfo 虚报）
 - **泛化**（共享文件缺省兼容）：`js/berlinGround.js` 裙边兜底色/404 色/mesh 名参数化（柏林默认值不变）；`js/environment.js` 地形分支改为 `theme==='berlin' || ground.type==='satellite'` 门控（其他关零影响）。旧地形/建筑代码保留——主菜单背景仍用它，删关卡 ground 字段即回退
