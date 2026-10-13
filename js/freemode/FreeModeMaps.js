@@ -17,6 +17,7 @@ const BARBAROSSA_MAP = {
   // #85 同步：卫星贴图地面（与战役同图不同配置对象，铁原则隔离）
   environment: {
     theme: 'barbarossa',
+    fog: { color: 0xc8e0f4, density: 0.00008 },   // #89 与战役同步：卫星图放远视距
     ground: {
       type: 'satellite',
       texture: '/img/barbarossa/ground.jpg',
@@ -35,24 +36,24 @@ const BARBAROSSA_MAP = {
       farDarken: 1.0,
     },
   },
-  // 中空云团（复制第2关 clouds 配置，独立维护；#85 同步战役侧 #83 优化值+新云带）
+  // 中空云团（复制第2关 clouds 配置，独立维护；#89 同步加密云量/放宽高度带与视距）
   clouds: {
     mode: 'fixed',
-    bandBox: [-15000, 15000, 1300, 1700, 3000, -18000],
+    bandBox: [-15000, 15000, 1000, 2100, 3000, -18000],
     spacing: 1300,
-    patchiness: 0.82,
-    patchScale: 8000,
+    patchiness: 0.70,
+    patchScale: 4000,
     blobsPerCluster: [5, 7],
     minSize: 320,
-    maxSize: 720,
+    maxSize: 900,
     opacity: 0.88,
     depthContrast: 1.0,
     shadowEnabled: false,
     cloudColor: [242, 244, 248],
-    distFade: [3000, 5000, 7000],
+    distFade: [4000, 7000, 10000],
     extraBands: [
       {
-        bandBox: [-15000, 15000, 1300, 1700, 3000, -18000],
+        bandBox: [-15000, 15000, 1000, 2100, 3000, -18000],
         spacing: 6000,
         blobsPerCluster: [2, 3],
         minSize: 220,

@@ -17,6 +17,12 @@
 
 ## 2026-10-13
 
+### #89 巴巴罗萨雾云观感调整
+- **雾**：density 0.00016 → 0.00008（18km 小地图遗留值，40km 卫星图需要更远视距；10km 处雾遮蔽 92%→47%，地平线仍由雾+裙边收边）
+- **云加密**（玩家反馈看不到云）：patchiness 0.82→0.70；云带高度 y1300-1700 → 1000-2100（盖到玩家 1800m 上空）；patchScale 8km→4km（晴空/云系斑块变小，沿途更易遇云）；maxSize 720→900；distFade 7km→10km
+- 自由模式 FreeModeMaps 副本同步（铁原则手动同步，含 fog）
+- draw calls 135→142（云增量在 distFade 控制下有界）
+
 ### #88 页面返回导航修复
 - 问题：各页"返回"按钮走 Router 历史栈 `back()`，历史栈混入简报页等中间页后，选关页"返回菜单"会先弹回简报页（任务开始页），需多次点击才能回菜单
 - 修复：六个页面的返回按钮全部改为显式目标导航（BriefingPage→选关、LevelSelectPage/SettingsPage/FreeMapSelectPage→菜单、FreeHangarPage→自由选图、MenuPage→封面），不再依赖历史栈
