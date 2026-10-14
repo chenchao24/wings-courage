@@ -59,7 +59,7 @@ def main():
     cloud_pct = np.count_nonzero(keep) / keep.size * 100
     print(f'云斑块 {kept} 个，掩膜覆盖 {cloud_pct:.2f}%')
 
-    backup = os.path.join(ROOT, '_archive', 'precompress', 'img', 'barbarossa')
+    backup = os.path.join(ROOT, '_archive', 'precompress', 'img', os.path.basename(os.path.dirname(path)))
     os.makedirs(backup, exist_ok=True)
     base = os.path.basename(path)
     cv2.imwrite(os.path.join(backup, base + '.before_decloud.jpg'), img)

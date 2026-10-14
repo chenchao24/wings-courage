@@ -117,6 +117,31 @@ async def test_level(p, level_id):
         check("barbarossa 无旧 Terrain/Buildings", sat.get("hasOldTerrain") is False and sat.get("buildings") is False)
         check("barbarossa 玩家出生≈1800m", abs((sat.get("playerAlt") or 0) - 1800) < 250)
 
+    # #92 库尔斯克卫星地面重构专项断言
+    if level_id == "kursk":
+        sat = await page.evaluate("""
+            () => {
+                const g = window.__shell.scene.getObjectByName('kurskGround');
+                const tex = g && g.material && g.material.map;
+                return {
+                    exists: !!g,
+                    skirt: !!window.__shell.scene.getObjectByName('kurskGroundSkirt'),
+                    texLoaded: !!(tex && tex.image && tex.image.width),
+                    hasOldTerrain: !!window.__shell.scene.getObjectByName('terrain'),
+                    buildings: !!window.__shell.env.buildings,
+                    roads: !!window.__shell.env.roads,   // 路网应被门控关闭（防双画 z-fight）
+                    flak: !!window.__shell.env.flak,     // Flak 不受影响
+                };
+            }
+        """)
+        print("  卫星地面:", sat)
+        check("kursk 卫星地面存在", sat.get("exists") is True)
+        check("kursk 裙边存在", sat.get("skirt") is True)
+        check("kursk 贴图已加载", sat.get("texLoaded") is True)
+        check("kursk 无旧 Terrain/Buildings", sat.get("hasOldTerrain") is False and sat.get("buildings") is False)
+        check("kursk 路网已关闭", sat.get("roads") is False)
+        check("kursk Flak 保留", sat.get("flak") is True)
+
     await page.screenshot(path=str(SCREENSHOTS_DIR / f"regress_{level_id}.png"))
     await browser.close()
 

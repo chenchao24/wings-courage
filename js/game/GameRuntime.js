@@ -1718,7 +1718,11 @@ export class GameRuntime {
     const ac = player.root;
 
     // 剧情模式：视角指令由 CinematicSystem 驱动，同步到本类 _camMode
-    if (this._cinematicActive && this.cinematic && this.cinematic.active) {
+    // 注意：跳过剧情的 1.2s 读条窗口内 cinematic.active=false（_skipping），
+    // 但 _camMode 可能仍是 cinematicAuto/Fixed——必须把这窗口仍当剧情处理，否则落到
+    // 外部视角分支会因 _camOffsets 无该键而崩（库尔斯克 5s 自动切环视后 ESC 必现）
+    const cinCamActive = this._cinematicActive && this.cinematic && (this.cinematic.active || this.cinematic._skipping);
+    if (cinCamActive) {
       this._camMode = this.cinematic.camMode;
       // cinematicAuto / cinematicFixed：委托 CinematicSystem 计算相机位置
       if (this._camMode === 'cinematicAuto') {
@@ -1745,7 +1749,8 @@ export class GameRuntime {
     } else {
       // 外部视角（chase / observe）：body frame 偏移 + lerp 平滑
       const offKey = (this._camMode === 'observe') ? OBSERVE_MODES[this._observeIdx] : this._camMode;
-      _camOff.copy(this._camOffsets[offKey]).applyQuaternion(ac.quaternion).add(ac.position);
+      // 防御：未知模式回退 chase（剧情切换窗口等极端时序兜底，不崩帧）
+      _camOff.copy(this._camOffsets[offKey] || this._camOffsets.chase).applyQuaternion(ac.quaternion).add(ac.position);
       // 首帧直接 copy 到位（避免从 AppShell 背景位置 lerp 飞过来），之后 lerp 平滑跟随
       if (this._camInited) {
         camera.position.lerp(_camOff, 1 - Math.exp(-dt * 4.5));

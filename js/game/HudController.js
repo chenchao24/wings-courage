@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import { hudTemplate } from './hud-template.js';
 
-// 敌机标记颜色集（战斗机红色 / IL-2 攻击机土黄色）
+// 敌机标记颜色集（战斗机亮红 / IL-2 攻击机亮桔）
+// #93：原红色在卫星图农田背景上不够跳——提亮；IL-2 由土黄改亮桔与红色系拉开
 const _ENEMY_CLR = {
-  normal: '#ff5a4d', dim: 'rgba(255,90,77,0.45)',
-  shadow: 'rgba(255,90,77,0.6)', shadowDim: 'rgba(255,90,77,0.2)',
+  normal: '#ff6b5e', dim: 'rgba(255,107,94,0.5)',
+  shadow: 'rgba(255,107,94,0.65)', shadowDim: 'rgba(255,107,94,0.22)',
 };
 const _IL2_CLR = {
-  normal: '#c8a050', dim: 'rgba(200,160,80,0.45)',
-  shadow: 'rgba(200,160,80,0.6)', shadowDim: 'rgba(200,160,80,0.2)',
+  normal: '#ff7a2e', dim: 'rgba(255,122,46,0.5)',
+  shadow: 'rgba(255,122,46,0.65)', shadowDim: 'rgba(255,122,46,0.22)',
 };
 
 /**

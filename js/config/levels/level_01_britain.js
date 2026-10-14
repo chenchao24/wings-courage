@@ -166,10 +166,14 @@ export default {
     theme: 'britain',
 
     // 天空：浅灰蓝（阴云密布感）
+    // #91：地平线辉光带（与雾色/地平线底色的浅灰一致；雾仍关闭，过渡带补足天际线层次）
     sky: {
       topColor:    0x4a5a6e,   // 天顶灰蓝
       midColor:    0x7a8898,   // 中部浅灰蓝
       bottomColor: 0xb8c4d0,   // 地平线浅灰
+      horizonColor:    0xc4cdd8,
+      horizonStrength: 0.70,
+      horizonWidth:    0.08,
     },
 
     // 太阳：低仰角 + 偏冷色（被云遮挡的散射光）
@@ -186,7 +190,6 @@ export default {
       color: 0xb8c4d0,
       density: 0,
     },
-
     // 光照：调亮环境光（解决飞机过暗问题）
     lights: {
       hemiSky: 0xa8b8c8,

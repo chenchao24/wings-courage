@@ -70,7 +70,13 @@ export default {
       horizonStrength: 0.85,
       horizonWidth: 0.10,
     },
-    fog: { color: 0xd8eaf4, density: 0.000055 },
+    fog: {
+      // #91：线性雾（near 1500 / far 28000，40km 图幅配套）：近处有薄雾层次，远处收边
+      type: 'linear',
+      near: 1500,
+      far: 64000,
+      color: 0xd8eaf4,
+    },
 
     // 卫星地面（BerlinGround 通用类）：纯平 + 视觉裙边，无 Terrain/Buildings
     // 不设高度锁：教学关保留自由低空狗斗与触地判定（getHeight 恒 0）

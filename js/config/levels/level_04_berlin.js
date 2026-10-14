@@ -402,11 +402,12 @@ export default {
       horizonWidth: 0.06,
     },
     fog: {
-      // #91：density 0.00007→0.00004（柏林 80km 图幅东缘机群处曾 99.8% 白化失真）；
-      // 20km 处遮蔽 86%→45%，远景可读；50km 裙边外缘仍 >98% 遮蔽
-      // 颜色与地平线辉光带同色（0xdfe7ee），天边不再是一道白墙
+      // #91：FogExp2 0.00007 → 线性雾（near 2000 / far 42000）。近处保留大气薄雾，
+      // 远处均匀遮蔽，42km 裙边外缘全遮；颜色与地平线辉光带同色（0xdfe7ee）
+      type: 'linear',
+      near: 2000,
+      far: 64000,
       color: 0xdfe7ee,
-      density: 0.00004,
     },
     lights: {
       hemiSky: 0xbfd4e8,

@@ -18,7 +18,7 @@ const BARBAROSSA_MAP = {
   environment: {
     theme: 'barbarossa',
     sky: { horizonColor: 0xd8eaf4, horizonStrength: 0.85, horizonWidth: 0.10 },  // #91 同步战役
-    fog: { color: 0xd8eaf4, density: 0.000055 },   // #91 与战役同步
+    fog: { type: 'linear', near: 1500, far: 64000, color: 0xd8eaf4 },   // 最远端 ~78% 不死白，与战役同步
     ground: {
       type: 'satellite',
       texture: '/img/barbarossa/ground.jpg',

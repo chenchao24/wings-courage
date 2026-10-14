@@ -269,7 +269,13 @@ export function createEnvironment(scene, renderer, envConfig = null) {
   scene.add(sunLight.target);
 
   // ---------- 雾 ----------
-  scene.fog = new THREE.FogExp2(fogColor, fogDensity);
+  // #91：支持线性雾（fog.type:'linear' + near/far）——近处有大气薄雾、远处均匀遮蔽，
+  // 比 FogExp2 更接近真实大气透视（柏林/巴巴罗萨卫星图关卡用）；缺省 FogExp2 行为不变
+  if (cfg.fog?.type === 'linear') {
+    scene.fog = new THREE.Fog(fogColor, cfg.fog.near ?? 2000, cfg.fog.far ?? 42000);
+  } else {
+    scene.fog = new THREE.FogExp2(fogColor, fogDensity);
+  }
 
   // ---------- 地形 ----------
   // 关卡隔离：theme 'berlin' 或 ground.type 'satellite' 用 BerlinGround
@@ -279,7 +285,7 @@ export function createEnvironment(scene, renderer, envConfig = null) {
   let terrain, ground, buildings = null, obstacles = [], obstacleCenters = [];
   if (useSatelliteGround) {
     const maxAniso = renderer?.capabilities?.getMaxAnisotropy?.() ?? 4;
-    terrain = new BerlinGround({ anisotropy: Math.min(8, maxAniso), ...(cfg.ground || {}) });
+    terrain = new BerlinGround({ anisotropy: Math.min(16, maxAniso), ...(cfg.ground || {}) });
     ground = terrain.create();
     scene.add(ground);
   } else {
@@ -322,7 +328,8 @@ export function createEnvironment(scene, renderer, envConfig = null) {
   // 关卡隔离：cfg.theme === 'kursk' 是唯一入口，britain/barbarossa 不创建。
   // 路网骨架与 terrain.js KURSK_ROAD_SKELETON 严格一致（农田距离分布共用）。
   let roads = null;
-  if (cfg.theme === 'kursk') {
+  // #92：卫星图地面时关路网——图上自有真实道路，双画会 z-fight
+  if (cfg.theme === 'kursk' && cfg.ground?.type !== 'satellite') {
     roads = new KurskRoads(terrain);
     scene.add(roads.group);
   }

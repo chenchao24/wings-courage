@@ -181,10 +181,23 @@ export default {
   environment: {
     theme: 'kursk',
 
-    // 低空日出（日出后一小时）：低仰角朝阳，暖橙光，长阴影
-    // 烘托 1943.07.05 清晨堡垒行动首日氛围
+    // 卫星地面（#92，BerlinGround 通用类）：普罗霍罗卡以南草原 44×44km（Sentinel-2 2024-08-28，
+    // 管线 scripts/fetch_kursk_ground.py）；无 Terrain/KurskRoads/Buildings（roads 由
+    // environment.js 按 ground.type 门控跳过）；terrain 配置保留仅作回退
+    ground: {
+      type: 'satellite',
+      texture: '/img/kursk/ground.jpg',
+      width: 44000,
+      depth: 44000,
+      name: 'kurskGround',
+      skirtColor: 0x5c5640,          // 卫星图均值（农田棕绿）
+      fallbackColor: [93, 87, 64],
+    },
+
+    // 低空日出→上午偏晨（#92：纯平卫星图后 10° 低阳的"丘陵长阴影"不复存在，
+    // 抬高到 28° 让贴图受光均匀；暖橙色调保留堡垒行动清晨氛围）
     sun: {
-      elevation: 10,             // 低位太阳（默认 42），长投影强化地形起伏感
+      elevation: 28,
       azimuth: 95,               // 东方偏南（默认 150）
       color: 0xffd9a0,           // 暖橙日出光（默认 0xffe8c0）
     },
@@ -192,13 +205,18 @@ export default {
       topColor: 0x2a5a9a,        // 天顶稍深蓝（日出蓝天）
       midColor: 0x7fa8c8,        // 中段过渡
       bottomColor: 0xe8c8a0,     // 地平线暖橙（日出霞光）
+      // #91：地平线辉光带取雾灰白与霞光暖橙之间的暖米灰（本关雾色刻意中性，见 fog 注释）
+      horizonColor: 0xe8e0d0,
+      horizonStrength: 0.60,
+      horizonWidth: 0.10,
     },
     fog: {
-      // terrain_test 调校满意值（2026-08-10）：原 0.00018 太浓，降到 0.00009（比 britain 0.00012 更通透）。
-      // 中性灰白 0xe0e0e0 最接近真实大气雾的"白茫茫"感，不与天空底部暖橙霞光冲突（地平线冷暖过渡自然）。
-      // 底盘 apron 读 scene.fog.color 自动跟随。
-      color: 0xe0e0e0,
-      density: 0.00009,
+      // #92：FogExp2 0.00009 → 线性雾（near 2000 / far 32000）。卫星图纹理在 10km+ 被
+      // 指数雾洗白偏快；线性雾近处保留空气薄霭、远处均匀收边，颜色取雾灰白与霞光暖橙之间
+      type: 'linear',
+      near: 2000,
+      far: 64000,
+      color: 0xe4e0d4,
     },
     lights: {
       hemiSky: 0xc8b890,         // 暖天光（默认 0xbfd8ff 蓝白）

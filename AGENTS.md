@@ -36,6 +36,7 @@ _archive/             # 本地归档（改前备份、一次性脚本；已被 .
 
 ## 版本
 - 当前：0.72.8.20
+- 2026-10-14 库尔斯克卫星化（CHANGELOG #92）：第 3 关地面同为 BerlinGround 卫星图（`img/kursk/ground.jpg` 44×44km，管线 `scripts/fetch_kursk_ground.py`）；**KurskRoads 仅在建Terrain时创建（卫星图时跳过，防双画）**；回归断言含"路网已关闭"
 - 2026-10-13 库尔斯克战场瘦身（CHANGELOG #86）：kurskBattlefield.js 只剩防空炮位计算（aaGunPositions 供 Flak），地面物件全删；**勿恢复旧视觉构建代码（git 历史有），除非配套做低空对地玩法**
 - 2026-10-13 巴巴罗萨地图卫星化重构（CHANGELOG #85）：第 2 关地面改用 BerlinGround 卫星贴图（`ground.type:'satellite'` 门控，`img/barbarossa/ground.jpg` 40×32km 10m/px，管线 `scripts/fetch_barbarossa_ground.py`）；玩家 1800m/敌机 1400-1800m/spawnDist 3000/patrolAlt 800-1400；旧程序化地形保留为主菜单背景与缺省回退，勿删 terrain.js/buildings.js 缺省逻辑
 - 2026-10-12 上线前优化（CHANGELOG #84）：全部在役 GLB 已 meshopt 压缩（me_262/fw190 含 webp 纹理）；**重跑 `scripts/optimize_b17.mjs`/`optimize_p51.mjs` 会重新生成未压缩 glb，必须补跑 `npx gltf-transform meshopt`**；调试全局仅 localhost/?debug 挂载；调参工具页在 `tools/`（依赖 /node_modules，不进部署）
