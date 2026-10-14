@@ -71,10 +71,10 @@ export default {
       horizonWidth: 0.10,
     },
     fog: {
-      // #91：线性雾（near 1500 / far 28000，40km 图幅配套）：近处有薄雾层次，远处收边
+      // #94：线性雾 near 取负值 → 全局 ~5% 空气底雾 + 50km 处 ~90% 封顶（同柏林）
       type: 'linear',
-      near: 1500,
-      far: 64000,
+      near: -9900,
+      far: 65000,
       color: 0xd8eaf4,
     },
 

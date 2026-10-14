@@ -211,11 +211,10 @@ export default {
       horizonWidth: 0.10,
     },
     fog: {
-      // #92：FogExp2 0.00009 → 线性雾（near 2000 / far 32000）。卫星图纹理在 10km+ 被
-      // 指数雾洗白偏快；线性雾近处保留空气薄霭、远处均匀收边，颜色取雾灰白与霞光暖橙之间
+      // #94：线性雾 near 取负值 → 全局 ~5% 空气底雾 + 50km 处 ~90% 封顶（同柏林）
       type: 'linear',
-      near: 2000,
-      far: 64000,
+      near: -9900,
+      far: 65000,
       color: 0xe4e0d4,
     },
     lights: {

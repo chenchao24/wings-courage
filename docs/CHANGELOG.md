@@ -17,6 +17,12 @@
 
 ## 2026-10-14
 
+### #94 全局空气底雾（三关卫星图关卡）
+- 用户定向："给大气整个加底雾"——线性雾 `near` 取负值实现常数底雾：near=-9900/far=65000 → 0m 起 ~5% 空气薄霭、50km 视野极限 ~90% 封顶
+- 中间尝试记录：sqrt 封顶曲线（否决）、Crytek 式高度雾注入（用户试飞后否决，已回退 git checkout）——最终落地为零 shader 改动的纯配置方案
+- 柏林/巴巴罗萨/库尔斯克 + 自由模式副本同步；不列颠雾仍为 0 不动
+- 回归三关+柏林全绿
+
 ### #92 库尔斯克地图卫星化（方案 A 纯平）
 - 地面换 Sentinel-2 卫星图：普罗霍罗卡以南草原 44×44km（2024-08-28 影像，原生 10m/px，3.4MB），农田+河谷+小村，无大城市；管线 `scripts/fetch_kursk_ground.py`（granule 覆盖踩坑记录：tileInfo 虚报/空 granule/HEAD content-length 预检/跳过名单）
 - 代码：`environment.js` KurskRoads 按 `ground.type==='satellite'` 门控关闭（防双画 z-fight）；关卡加 `ground` 配置；太阳 elevation 10°→28°（纯平后长阴影无意义）；雾改线性雾

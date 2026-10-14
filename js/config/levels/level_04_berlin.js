@@ -402,11 +402,11 @@ export default {
       horizonWidth: 0.06,
     },
     fog: {
-      // #91：FogExp2 0.00007 → 线性雾（near 2000 / far 42000）。近处保留大气薄雾，
-      // 远处均匀遮蔽，42km 裙边外缘全遮；颜色与地平线辉光带同色（0xdfe7ee）
+      // #94：线性雾 near 取负值 → 全局 ~5% 空气底雾（高空俯瞰的密度阻隔感），
+      // 50km 视野极限处 ~90% 封顶（near/far 由锚点反解）；颜色与辉光带同色
       type: 'linear',
-      near: 2000,
-      far: 64000,
+      near: -9900,
+      far: 65000,
       color: 0xdfe7ee,
     },
     lights: {
