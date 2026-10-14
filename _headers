@@ -1,17 +1,22 @@
 # Cloudflare Pages 缓存策略（根路径部署）
-# 资产文件名不带 hash：大资产缓存一周，便于更新后一周内全网自然生效
+# 设计目标：每次发布新版本后，玩家浏览器下次访问即拿到最新内容（#95）
+# 原理：Pages 每次部署自动刷新边缘缓存；此文件只管浏览器侧。
+#   - HTML/JS：no-cache（每次访问都回源校验，ETag 304 不重复下载，代码更新即时生效）
+#   - 大资产（模型/音频/图片）：1 天自然过期 + 回源校验（体积大，避免每次访问都校验）
+#     ⚠️ 同名替换的大资产最晚次日生效；需要立即生效时请改文件名（如 b17-v2.glb）并同步改引用
+#   - vendor/three：一周（不随迭代变化）
 
 /model/*
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=86400, must-revalidate
 /sound/*
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=86400, must-revalidate
 /img/*
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=86400, must-revalidate
 /vendor/*
   Cache-Control: public, max-age=604800
 
 /js/*
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, no-cache
 
 /
   Cache-Control: public, max-age=0, must-revalidate

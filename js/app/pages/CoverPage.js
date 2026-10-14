@@ -7,7 +7,7 @@ import { BasePage } from './_base.js';
  * 背景图已含游戏名称，不再重复显示标题。
  */
 const COVER_BG = ['/img/mb1.webp', '/img/mb2.webp'];
-const APP_VERSION = '0.72.8.20';
+const APP_VERSION = '0.84';
 
 export class CoverPage extends BasePage {
   get name() { return 'cover'; }

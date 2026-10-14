@@ -2,7 +2,7 @@
 
 基于 Three.js 的二战空战网页游戏（第三人称/座舱视角）。纯静态站，无构建步骤：`index.html` + importmap 指向 `/vendor/three`，入口 `js/main.js`，全部是原生 ES Module。
 
-- 版本：**0.72.8.20**
+- 版本：**0.84**
 - 渲染：Three.js r160（本地 `vendor/three`，不依赖 CDN）
 - 音效：WebAudio 程序化合成 + 实录音频文件（引擎/枪声/命中）
 - 详细文档：迭代时间线 [`docs/CHANGELOG.md`](./docs/CHANGELOG.md)、交接文档 [`docs/HANDOVER.md`](./docs/HANDOVER.md)、性能优化 [`docs/OPTIMIZATION.md`](./docs/OPTIMIZATION.md)、协作约定 [`AGENTS.md`](./AGENTS.md)

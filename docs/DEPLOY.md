@@ -39,11 +39,12 @@ Pages 控制台手工上传同理：只挑上面"发布集清单"中的文件/�
 
 | 路径 | Cache-Control |
 | --- | --- |
-| `/model/*`、`/sound/*`、`/img/*`、`/vendor/*` | `public, max-age=604800`（一周） |
-| `/js/*` | `public, max-age=3600`（一小时） |
+| `/js/*` | `no-cache`（每次访问回源校验，ETag 304 不重复下载——**代码更新玩家下次访问即生效**） |
+| `/model/*`、`/sound/*`、`/img/*` | `max-age=86400, must-revalidate`（大资产 1 天过期；**同名替换最晚次日生效，需立即生效请改文件名**） |
+| `/vendor/*` | `public, max-age=604800`（three.js 不随迭代变化） |
 | `/`、`/*.html` | `public, max-age=0, must-revalidate`（每次回源校验） |
 
-注意：资产文件名不带 hash，**模型/音频/图片更新后最长一周才会对所有访客生效**（等旧缓存自然过期）。需要立刻生效时，到 Cloudflare 控制台 Purge Cache，或给文件改名并同步更新引用处。
+Pages 每次部署会自动刷新**边缘节点**缓存；`_headers` 管的是**玩家浏览器**侧。
 
 ## 本地预览
 
