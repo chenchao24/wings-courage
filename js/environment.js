@@ -32,6 +32,11 @@ export function createEnvironment(scene, renderer, envConfig = null) {
   const hemiGround = cfg.lights?.hemiGround ?? 0x4a5d3a;
   const hemiIntensity = cfg.lights?.hemiIntensity ?? 1.0;
   const sunIntensity = cfg.lights?.sunIntensity ?? 3.0;
+  // 地平线大气辉光带（#91）：天际线处泛白/浅蓝过渡，衔接距离雾消除"白墙"感
+  // horizonStrength 默认 0 = 关闭，未配置的关卡输出逐字节不变（关卡隔离）
+  const horizonColor = cfg.sky?.horizonColor ?? 0xdfe9f2;
+  const horizonStrength = cfg.sky?.horizonStrength ?? 0;
+  const horizonWidth = cfg.sky?.horizonWidth ?? 0.08;
 
   // 远景云带（天空 shader 内 fbm 噪声绘制，零 draw call，无穷远海平线层云）
   const skyClouds = cfg.skyClouds ?? {};
@@ -93,6 +98,10 @@ export function createEnvironment(scene, renderer, envConfig = null) {
         uCloudFarDarken:{ value: cloudFarDarken },
         uCloudZenith:   { value: cloudZenith },
         uCloudStreak:   { value: cloudStreak },
+        // 地平线辉光带
+        uHorizonColor:    { value: new THREE.Color(horizonColor) },
+        uHorizonStrength: { value: horizonStrength },
+        uHorizonWidth:    { value: horizonWidth },
       },
       vertexShader: /* glsl */`
         varying vec3 vDir;
@@ -106,6 +115,8 @@ export function createEnvironment(scene, renderer, envConfig = null) {
         uniform vec3 topColor, midColor, bottomColor, sunDir, sunColor;
         uniform float uTime, uCloudCoverage, uCloudDrift, uCloudEnabled, uCloudFarDarken, uCloudZenith, uCloudStreak;
         uniform vec3 uCloudColor, uCloudHighlight;
+        uniform vec3 uHorizonColor;
+        uniform float uHorizonStrength, uHorizonWidth;
 
         float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float vnoise(vec2 p) {
@@ -150,6 +161,14 @@ export function createEnvironment(scene, renderer, envConfig = null) {
           float h = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
           vec3 col = mix(bottomColor, midColor, smoothstep(0.0, 0.45, h));
           col = mix(col, topColor, smoothstep(0.4, 1.0, h));
+
+          // 地平线大气辉光带（#91）：天际线处泛白/浅蓝过渡，衔接距离雾。
+          // 高斯带峰值在 dir.y=0（地平线），向上衰减；strength=0 时输出不变（缺省关闭）
+          if (uHorizonStrength > 0.001) {
+            float hz = exp(-pow(max(dir.y, 0.0) / uHorizonWidth, 2.0)) * uHorizonStrength;
+            col = mix(col, uHorizonColor, clamp(hz, 0.0, 1.0));
+          }
+
           float sd = max(dot(dir, normalize(sunDir)), 0.0);
           col += sunColor * pow(sd, 6.0) * 0.18;
           col += sunColor * pow(sd, 48.0) * 0.5;

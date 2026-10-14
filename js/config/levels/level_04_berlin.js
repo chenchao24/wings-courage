@@ -396,13 +396,17 @@ export default {
       topColor: 0x3a6fb8,
       midColor: 0x7fa8d0,
       bottomColor: 0xd8e0e8,
+      // 地平线大气辉光带（#91）：天际线泛白蓝过渡，与雾色同色衔接消缝
+      horizonColor: 0xdfe7ee,
+      horizonStrength: 0.70,
+      horizonWidth: 0.06,
     },
     fog: {
-      // 距离雾自动完成两件事：正下方 3-7km 清晰展示贴图；侧看 20km+ 浓雾藏住地图边缘
-      // density 0.00010→0.00007：压低 15km+ 跳跃（15km 0.90→0.66, 20km 0.98→0.87），
-      // 10km 内会一起变淡（贴图展示更清晰），图幅边缘由 berlinGround 裙边兜底
-      color: 0xd8dee4,
-      density: 0.00007,
+      // #91：density 0.00007→0.00004（柏林 80km 图幅东缘机群处曾 99.8% 白化失真）；
+      // 20km 处遮蔽 86%→45%，远景可读；50km 裙边外缘仍 >98% 遮蔽
+      // 颜色与地平线辉光带同色（0xdfe7ee），天边不再是一道白墙
+      color: 0xdfe7ee,
+      density: 0.00004,
     },
     lights: {
       hemiSky: 0xbfd4e8,

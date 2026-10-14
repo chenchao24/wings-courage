@@ -62,10 +62,15 @@ export default {
   // 地面：Sentinel-2 真彩色（明斯克以西平原 40×32km，原生 10m/px，scripts/fetch_barbarossa_ground.py 产出）
   // 天空/太阳/光照沿用巴巴罗萨默认（夏季清晨蓝天，hemiGround 绿色恰好匹配卫星图色调）
   // #89：雾密度 0.00016(18km 小地图遗留) → 0.00008——40km 卫星图需要更远视距，
-  // 10km 处雾遮蔽 92%→47%，地平线仍由雾+裙边自然收边
+  // #91：再加地平线辉光带（泛白蓝过渡）并继续降雾到 0.000055，雾色与辉光带同色消缝
   environment: {
     theme: 'barbarossa',
-    fog: { color: 0xc8e0f4, density: 0.00008 },
+    sky: {
+      horizonColor: 0xd8eaf4,   // 夏季清晨地平线泛白浅蓝
+      horizonStrength: 0.85,
+      horizonWidth: 0.10,
+    },
+    fog: { color: 0xd8eaf4, density: 0.000055 },
 
     // 卫星地面（BerlinGround 通用类）：纯平 + 视觉裙边，无 Terrain/Buildings
     // 不设高度锁：教学关保留自由低空狗斗与触地判定（getHeight 恒 0）

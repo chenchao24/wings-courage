@@ -17,7 +17,8 @@ const BARBAROSSA_MAP = {
   // #85 同步：卫星贴图地面（与战役同图不同配置对象，铁原则隔离）
   environment: {
     theme: 'barbarossa',
-    fog: { color: 0xc8e0f4, density: 0.00008 },   // #89 与战役同步：卫星图放远视距
+    sky: { horizonColor: 0xd8eaf4, horizonStrength: 0.85, horizonWidth: 0.10 },  // #91 同步战役
+    fog: { color: 0xd8eaf4, density: 0.000055 },   // #91 与战役同步
     ground: {
       type: 'satellite',
       texture: '/img/barbarossa/ground.jpg',
